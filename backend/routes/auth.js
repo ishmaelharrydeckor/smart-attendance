@@ -14,6 +14,15 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'All student details are required.' });
   }
 
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Only KNUST student emails (@st.knust.edu.gh or @knust.edu.gh) are allowed.' });
+  }
+
+  if (!course_ids || !Array.isArray(course_ids) || course_ids.length === 0) {
+    return res.status(400).json({ error: 'You must select at least one course to register.' });
+  }
+
   try {
     // Check if email or student ID exists
     const checkUser = await db.query(

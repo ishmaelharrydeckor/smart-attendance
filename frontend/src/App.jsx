@@ -436,6 +436,20 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+    if (!emailRegex.test(email)) {
+      showToast('Only KNUST student emails (@st.knust.edu.gh or @knust.edu.gh) are allowed.', 'error');
+      setLoading(false);
+      return;
+    }
+
+    if (selectedCourses.length === 0) {
+      showToast('You must select at least one course to register.', 'error');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
