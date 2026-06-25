@@ -497,10 +497,28 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     try {
       const data = await apiFetch('/api/lecturer/sessions');
       setSessions(data);
+      const active = data.find(s => s.is_active);
+      if (active) {
+        setActiveSession(active);
+        setActiveTab('live-session');
+        pollQrStatus(active.id);
+      }
     } catch (e) {
       console.warn(e.message);
     }
   };
+
+  useEffect(() => {
+    let timer;
+    if (activeSession && secondsRemaining > 0) {
+      timer = setInterval(() => {
+        setSecondsRemaining(prev => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [activeSession?.id, secondsRemaining === 0]);
 
   const createCourse = async (e) => {
     e.preventDefault();
@@ -550,6 +568,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       try {
         const status = await apiFetch(`/api/sessions/${sessionId}/qr-status`);
         setSecondsRemaining(status.seconds_remaining);
+        setActiveSession(status);
 
         if (status.status === 'EXPIRED') {
           showToast('Session checking window closed.', 'info');

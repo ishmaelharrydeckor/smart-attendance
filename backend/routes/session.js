@@ -39,14 +39,15 @@ router.get('/:id/qr-status', authenticateToken, async (req, res) => {
     // Auto-rotation logic
     if (now > new Date(session.qr_expires_at)) {
       const newQrToken = crypto.randomBytes(32).toString('hex');
+      const newSessionCode = 'ATT-' + Math.floor(1000 + Math.random() * 9000);
       const newExpiry = new Date(now.getTime() + (session.qr_rotation_interval_mins || 1) * 60 * 1000);
 
       const updateResult = await db.query(
         `UPDATE sessions 
-         SET qr_token = $1, qr_expires_at = $2 
-         WHERE id = $3 
+         SET qr_token = $1, qr_expires_at = $2, session_code = $3
+         WHERE id = $4 
          RETURNING *`,
-        [newQrToken, newExpiry, session.id]
+        [newQrToken, newExpiry, newSessionCode, session.id]
       );
       session = updateResult.rows[0];
     }
