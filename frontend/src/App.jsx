@@ -28,7 +28,9 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  ArrowLeft
+  ArrowLeft,
+  Upload,
+  Printer
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -129,6 +131,50 @@ export default function App() {
     return response.json();
   };
 
+  const queueOfflineRequest = (endpoint, body) => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+      queue.push({ endpoint, body, timestamp: new Date().toISOString() });
+      localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
+      showToast("Check-in queued locally (offline mode).", "info");
+    } catch (e) {
+      console.error("Failed to queue request offline:", e);
+    }
+  };
+
+  const syncOfflineQueue = async () => {
+    if (!navigator.onLine) return;
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    if (queue.length === 0) return;
+
+    localStorage.removeItem('offline_attendance_queue');
+    showToast("Internet connection restored. Syncing offline check-ins...", "info");
+
+    for (const item of queue) {
+      try {
+        const response = await apiFetch(item.endpoint, {
+          method: 'POST',
+          body: JSON.stringify(item.body)
+        });
+        showToast(response.message || "Synced successfully!");
+      } catch (err) {
+        showToast(`Sync failed: ${err.message}`, 'error');
+        if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+          const currentQueue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+          currentQueue.push(item);
+          localStorage.setItem('offline_attendance_queue', JSON.stringify(currentQueue));
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('online', syncOfflineQueue);
+    return () => {
+      window.removeEventListener('online', syncOfflineQueue);
+    };
+  }, [token]);
+
   return (
     <div className={`min-h-screen ${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} font-sans`}>
       {/* Toast Alert Banner */}
@@ -212,6 +258,7 @@ export default function App() {
           settings={settings}
           showToast={showToast}
           apiFetch={apiFetch}
+          queueOfflineRequest={queueOfflineRequest}
         />
       )}
     </div>
@@ -495,8 +542,18 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [createCourseSemester, setCreateCourseSemester] = useState('2');
   const [selectedCourseForSession, setSelectedCourseForSession] = useState('');
   const [sessionDuration, setSessionDuration] = useState(10);
+  const [lateGracePeriod, setLateGracePeriod] = useState(10);
   const [capturingGps, setCapturingGps] = useState(false);
-  const [sessionRadius, setSessionRadius] = useState(200);
+  const [csvEnrollList, setCsvEnrollList] = useState([]);
+  const [enrollCourseId, setEnrollCourseId] = useState('');
+  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
+  const [overrideModalOpen, setOverrideModalOpen] = useState(false);
+  const [overrideStudentId, setOverrideStudentId] = useState('');
+  const [overridePresent, setOverridePresent] = useState(true);
+  const [overrideStatus, setOverrideStatus] = useState('present');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogsOpen, setAuditLogsOpen] = useState(false);
 
   // Active Live Session details
   const [activeSession, setActiveSession] = useState(null);
@@ -525,6 +582,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   useEffect(() => {
     setSelectedCourseId(null);
   }, [selectedPeriodId]);
+
+  useEffect(() => {
+    return () => {
+      if (qrPollInterval.current) clearInterval(qrPollInterval.current);
+    };
+  }, []);
 
   const loadStats = async (courseId) => {
     try {
@@ -653,6 +716,106 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     }
   };
 
+  const handleCsvImportFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target.result;
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length < 2) {
+        showToast('CSV file is empty or missing headers.', 'error');
+        return;
+      }
+      
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+      const parsed = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+        if (cols.length === headers.length) {
+          const item = {};
+          headers.forEach((h, idx) => {
+            item[h] = cols[idx];
+          });
+          parsed.push(item);
+        }
+      }
+
+      const validated = parsed.map(item => {
+        return {
+          name: item.Name || item.name || '',
+          student_id: item['Student ID'] || item.student_id || '',
+          level: item.Level || item.level || '',
+          email: item.Email || item.email || ''
+        };
+      }).filter(s => s.name && s.student_id && s.level && s.email);
+
+      if (validated.length === 0) {
+        showToast('No valid student records found. Check headers: Name, Student ID, Level, Email', 'error');
+        return;
+      }
+
+      setCsvEnrollList(validated);
+    };
+    reader.readAsText(file);
+  };
+
+  const submitCsvEnrollment = async () => {
+    try {
+      const res = await apiFetch(`/api/lecturer/courses/${enrollCourseId}/bulk-enroll`, {
+        method: 'POST',
+        body: JSON.stringify({ students: csvEnrollList })
+      });
+      showToast(`Successfully enrolled ${res.enrolled.length} students!`);
+      setCsvPreviewOpen(false);
+      setCsvEnrollList([]);
+      loadCourses();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleOpenOverrideModal = (studentId, isPresent, currentStatus) => {
+    setOverrideStudentId(studentId);
+    setOverridePresent(isPresent);
+    setOverrideStatus(currentStatus || 'present');
+    setOverrideReason('');
+    setOverrideModalOpen(true);
+  };
+
+  const submitOverride = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/lecturer/sessions/${activeSession.id}/override`, {
+        method: 'POST',
+        body: JSON.stringify({
+          student_id: overrideStudentId,
+          is_present: overridePresent,
+          attendance_status: overrideStatus,
+          reason: overrideReason
+        })
+      });
+      showToast('Attendance corrected with audit log successfully!');
+      setOverrideModalOpen(false);
+      const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
+      setLiveAttendanceList(list);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const logs = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/audit-logs`);
+      setAuditLogs(logs);
+      setAuditLogsOpen(true);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const startSession = async () => {
     const courseId = selectedCourseForSession || selectedCourseId;
     if (!courseId) return showToast('Please select a course', 'error');
@@ -690,7 +853,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           location_name: locationName,
           gps_lat: lat,
           gps_lng: lng,
-          allowed_radius_meters: sessionRadius || 200
+          allowed_radius_meters: sessionRadius || 200,
+          late_grace_period_minutes: lateGracePeriod || 10
         })
       });
       setActiveSession(session);
@@ -1110,6 +1274,20 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                         />
                       </div>
                     </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-white/60 mb-1">Late Grace Period</label>
+                      <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <input
+                          type="number"
+                          placeholder="Grace Period (mins)"
+                          className="bg-transparent text-white placeholder-white/50 focus:outline-none w-full text-sm font-semibold"
+                          value={lateGracePeriod}
+                          onChange={e => setLateGracePeriod(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1247,6 +1425,13 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                       <span className="text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 px-2.5 py-1 rounded-lg">{course.code}</span>
                       <h4 className="font-bold text-base mt-2.5 leading-tight">{course.name}</h4>
                       <p className="text-xs text-slate-500 mt-1">{course.enrolled_count || 0} students enrolled</p>
+                      
+                      <button
+                        onClick={() => { setEnrollCourseId(course.id); setCsvEnrollList([]); setCsvPreviewOpen(true); }}
+                        className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 hover:text-brand-600 px-3 py-1.5 rounded-lg transition font-semibold mt-3 block w-max"
+                      >
+                        Import Roster (CSV)
+                      </button>
                     </div>
                     <button
                       onClick={() => deleteCourse(course.id)}
@@ -1428,9 +1613,17 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                 <h3 className="text-lg font-bold">Attendance Live Roster</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Total present: {liveAttendanceList.filter(l => l.is_present).length} / {liveAttendanceList.length}</p>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-center">
-                <span className="h-3.5 w-3.5 bg-emerald-500 rounded-full animate-ping"></span>
-                <span className="text-xs font-semibold text-slate-400">Live Updating</span>
+              <div className="flex items-center gap-4 self-start sm:self-center">
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 bg-emerald-500 rounded-full animate-ping"></span>
+                  <span className="text-xs font-semibold text-slate-400">Live Updating</span>
+                </div>
+                <button
+                  onClick={fetchAuditLogs}
+                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-1.5 rounded-lg transition font-semibold"
+                >
+                  View Audit Logs
+                </button>
               </div>
             </div>
 
@@ -1486,6 +1679,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                         <td className="p-3 text-slate-400 capitalize text-xs">{methodStr}</td>
                         <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{durationStr}</td>
                         <td className="p-3 text-right space-x-2">
+                          <button
+                            onClick={() => handleOpenOverrideModal(item.student_id, item.is_present, item.attendance_status)}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition"
+                          >
+                            Correct
+                          </button>
                           {!item.is_present ? (
                             <button
                               onClick={() => toggleAttendanceStatus(item.student_id, item.is_present)}
@@ -1652,9 +1851,275 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   );
 }
 
+      {/* CSV Roster Preview Modal */}
+      {csvPreviewOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
+            <h3 className="text-lg font-bold mb-2">Import Student Roster</h3>
+            <p className="text-xs text-slate-500 mb-4 font-medium">Upload a CSV file containing students' Name, Student ID, Level, and Email.</p>
+            
+            <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center cursor-pointer hover:border-brand-500 transition mb-4 relative">
+              <input
+                type="file"
+                accept=".csv"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleCsvImportFile}
+              />
+              <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Click or drag CSV file here to upload</p>
+            </div>
+
+            {csvEnrollList.length > 0 && (
+              <div className="flex-1 overflow-y-auto mb-4 border border-slate-100 dark:border-slate-800 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 font-bold border-b border-slate-100 dark:border-slate-800 text-slate-500 uppercase">
+                      <th className="p-3">Name</th>
+                      <th className="p-3">Student ID</th>
+                      <th className="p-3">Level</th>
+                      <th className="p-3">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {csvEnrollList.map((s, idx) => (
+                      <tr key={idx}>
+                        <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{s.name}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{s.student_id}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{s.level}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{s.email}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setCsvPreviewOpen(false); setCsvEnrollList([]); }}
+                className="bg-slate-100 dark:bg-slate-850 px-4 py-2.5 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={csvEnrollList.length === 0}
+                onClick={submitCsvEnrollment}
+                className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50"
+              >
+                Confirm Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Override Form Modal */}
+      {overrideModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <form onSubmit={submitOverride} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-2">Override Attendance</h3>
+            <p className="text-slate-500 text-xs mb-4">Modify the student's attendance records. These changes will be logged in the audit log.</p>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Presence Status</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOverridePresent(true)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition ${overridePresent ? 'bg-emerald-600 text-white' : 'bg-slate-105 dark:bg-slate-800 text-slate-700 dark:text-slate-350'}`}
+                  >
+                    Present
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOverridePresent(false)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition ${!overridePresent ? 'bg-red-650 text-white' : 'bg-slate-105 dark:bg-slate-800 text-slate-700 dark:text-slate-350'}`}
+                  >
+                    Absent
+                  </button>
+                </div>
+              </div>
+
+              {overridePresent && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Attendance Status Tag</label>
+                  <select
+                    value={overrideStatus}
+                    onChange={e => setOverrideStatus(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-xs"
+                  >
+                    <option value="present">Present (On time)</option>
+                    <option value="late">Late Check-in</option>
+                    <option value="early_leaver">Early Leaver</option>
+                    <option value="late_checkout">Late Checkout</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Reason for Override</label>
+                <textarea
+                  required
+                  placeholder="e.g. Student's camera failed to scan QR"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-xs dark:text-white"
+                  rows="3"
+                  value={overrideReason}
+                  onChange={e => setOverrideReason(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOverrideModalOpen(false)}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-xs font-semibold"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Audit History Logs Modal */}
+      {auditLogsOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Attendance Correction Audit Logs</h3>
+              <button
+                onClick={() => setAuditLogsOpen(false)}
+                className="text-slate-500 hover:text-slate-700 text-sm font-semibold"
+              >
+                Dismiss
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-xl">
+              {auditLogs.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">No manual corrections have been logged for this session.</div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 font-bold border-b border-slate-100 dark:border-slate-800 text-slate-500 uppercase">
+                      <th className="p-3">Student</th>
+                      <th className="p-3">Correction Details</th>
+                      <th className="p-3">Reason</th>
+                      <th className="p-3">Changed By</th>
+                      <th className="p-3 text-right">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {auditLogs.map(log => {
+                      const time = new Date(log.timestamp).toLocaleString();
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                          <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                            {log.student_name} <br/>
+                            <span className="text-[10px] text-slate-450">({log.academic_student_id})</span>
+                          </td>
+                          <td className="p-3">
+                            <span className="text-red-500 line-through mr-1 font-bold">{log.old_value}</span>
+                            &rarr;
+                            <span className="text-emerald-500 ml-1 font-bold">{log.new_value}</span>
+                          </td>
+                          <td className="p-3 text-slate-600 dark:text-slate-400 italic">{log.reason}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-400 font-semibold">{log.changed_by_name}</td>
+                          <td className="p-3 text-right text-[10px] text-slate-400 font-medium">{time}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 // Subcomponent for reports
 function CourseReportCard({ course, apiFetch, showToast, settings }) {
   const [loading, setLoading] = useState(false);
+
+  const printQRCodes = async () => {
+    try {
+      const data = await apiFetch(`/api/lecturer/courses/${course.id}/report`);
+      const uniqueStudentsMap = {};
+      data.forEach(row => {
+        uniqueStudentsMap[row.academic_student_id] = {
+          name: row.name,
+          student_id: row.academic_student_id,
+          level: row.level
+        };
+      });
+      const students = Object.values(uniqueStudentsMap);
+
+      if (students.length === 0) {
+        showToast('No students enrolled in this course to print.', 'error');
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Personal QR Codes - ${course.code}</title>
+            <style>
+              body { font-family: sans-serif; padding: 20px; }
+              .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+              .card { border: 2px solid #ccc; padding: 15px; border-radius: 10px; text-align: center; }
+              .name { font-weight: bold; margin-bottom: 5px; }
+              .id { font-size: 0.9em; color: #555; margin-bottom: 10px; }
+              .qr { display: flex; justify-content: center; align-items: center; width: 150px; height: 150px; margin: 0 auto; }
+              @media print {
+                .no-print { display: none; }
+              }
+            </style>
+            <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+          </head>
+          <body>
+            <h2>Personal QR Code Sheets - ${course.name} (${course.code})</h2>
+            <button class="no-print" onclick="window.print()" style="padding: 10px 20px; margin-bottom: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #999;">Print Now</button>
+            <div class="grid">
+              \${students.map(s => \`
+                <div class="card">
+                  <div class="name">\${s.name}</div>
+                  <div class="id">ID: \${s.student_id} | Level: \${s.level}</div>
+                  <div id="qr-\${s.student_id}" class="qr"></div>
+                </div>
+              \`).join('')}
+            </div>
+            <script>
+              setTimeout(() => {
+                \${students.map(s => \`
+                  try {
+                    var typeNumber = 4;
+                    var errorCorrectionLevel = 'L';
+                    var qr = qrcode(typeNumber, errorCorrectionLevel);
+                    qr.addData("\${s.student_id}");
+                    qr.make();
+                    document.getElementById("qr-\${s.student_id}").innerHTML = qr.createImgTag(5);
+                  } catch (e) {
+                    console.error("Failed to generate QR for \${s.student_id}", e);
+                  }
+                \`).join('')}
+              }, 300);
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
 
   const downloadCSV = async () => {
     setLoading(true);
@@ -1695,14 +2160,23 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
         <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 px-2 py-1 rounded font-semibold">{course.code}</span>
         <h4 className="font-bold text-base mt-2">{course.name}</h4>
       </div>
-      <button
-        onClick={downloadCSV}
-        disabled={loading}
-        className="bg-brand-600 hover:bg-brand-700 text-white p-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-semibold transition"
-      >
-        <Download className="w-4 h-4" />
-        {loading ? 'Exporting...' : 'Export CSV'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={printQRCodes}
+          className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 text-sm font-semibold transition"
+        >
+          <Printer className="w-4 h-4" />
+          Print QRs
+        </button>
+        <button
+          onClick={downloadCSV}
+          disabled={loading}
+          className="bg-brand-600 hover:bg-brand-700 text-white p-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-semibold transition"
+        >
+          <Download className="w-4 h-4" />
+          {loading ? 'Exporting...' : 'Export CSV'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1710,13 +2184,18 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
 // -------------------------------------------------------------
 // STUDENT PORTAL CONSOLE
 // -------------------------------------------------------------
-function StudentConsole({ user, settings, showToast, apiFetch }) {
+function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineRequest }) {
   const [courses, setCourses] = useState([]);
   const [history, setHistory] = useState([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [sessionCode, setSessionCode] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
+
+  // Fallback Student ID & Short Code Lookup states
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [fallbackStudentId, setFallbackStudentId] = useState('');
+  const [fallbackSessionCode, setFallbackSessionCode] = useState('');
 
   // Checkout additions
   const [isCheckoutAction, setIsCheckoutAction] = useState(false);
@@ -1813,21 +2292,33 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
 
   const handleQrCheckIn = async (qrToken) => {
     setCheckingIn(true);
+    const geo = await getCoordinates();
+    const payload = {
+      qr_token: qrToken,
+      lat: geo?.lat,
+      lng: geo?.lng,
+      accuracy: geo?.accuracy
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest('/api/student/check-in/qr', payload);
+      setCheckingIn(false);
+      return;
+    }
+
     try {
-      const geo = await getCoordinates();
       const response = await apiFetch('/api/student/check-in/qr', {
         method: 'POST',
-        body: JSON.stringify({
-          qr_token: qrToken,
-          lat: geo?.lat,
-          lng: geo?.lng,
-          accuracy: geo?.accuracy
-        })
+        body: JSON.stringify(payload)
       });
       showToast(response.message);
       loadStudentData();
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        queueOfflineRequest('/api/student/check-in/qr', payload);
+      } else {
+        showToast(err.message, 'error');
+      }
     } finally {
       setCheckingIn(false);
     }
@@ -1836,60 +2327,98 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
   const handleQrCheckOut = async (qrToken) => {
     if (!activeCheckin) return showToast('No active check-in found.', 'error');
     setCheckingIn(true);
+    const payload = {
+      method: 'qr',
+      qr_token: qrToken
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest(`/api/sessions/${activeCheckin.session_id}/checkout`, payload);
+      setCheckingIn(false);
+      return;
+    }
+
     try {
       const response = await apiFetch(`/api/sessions/${activeCheckin.session_id}/checkout`, {
         method: 'POST',
-        body: JSON.stringify({
-          method: 'qr',
-          qr_token: qrToken
-        })
+        body: JSON.stringify(payload)
       });
       showToast(response.message);
       setCheckoutStatusDetails(response.record);
       loadStudentData();
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        queueOfflineRequest(`/api/sessions/${activeCheckin.session_id}/checkout`, payload);
+      } else {
+        showToast(err.message, 'error');
+      }
     } finally {
       setCheckingIn(false);
     }
   };
 
   const handleCodeCheckIn = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setCheckingIn(true);
+    const geo = await getCoordinates();
+    const payload = {
+      session_code: sessionCode,
+      lat: geo?.lat,
+      lng: geo?.lng,
+      accuracy: geo?.accuracy
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest('/api/student/check-in/code', payload);
+      setSessionCode('');
+      setCodeOpen(false);
+      setCheckingIn(false);
+      return;
+    }
+
     try {
-      const geo = await getCoordinates();
       const response = await apiFetch('/api/student/check-in/code', {
         method: 'POST',
-        body: JSON.stringify({
-          session_code: sessionCode,
-          lat: geo?.lat,
-          lng: geo?.lng,
-          accuracy: geo?.accuracy
-        })
+        body: JSON.stringify(payload)
       });
       showToast(response.message);
       setSessionCode('');
       setCodeOpen(false);
       loadStudentData();
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        queueOfflineRequest('/api/student/check-in/code', payload);
+        setSessionCode('');
+        setCodeOpen(false);
+      } else {
+        showToast(err.message, 'error');
+      }
     } finally {
       setCheckingIn(false);
     }
   };
 
   const handleCodeCheckOut = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!activeCheckin) return showToast('No active check-in found.', 'error');
     setCheckingIn(true);
+    const payload = {
+      method: 'code',
+      session_code: sessionCode
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest(`/api/sessions/${activeCheckin.session_id}/checkout`, payload);
+      setSessionCode('');
+      setCodeOpen(false);
+      setCheckingIn(false);
+      return;
+    }
+
     try {
       const response = await apiFetch(`/api/sessions/${activeCheckin.session_id}/checkout`, {
         method: 'POST',
-        body: JSON.stringify({
-          method: 'code',
-          session_code: sessionCode
-        })
+        body: JSON.stringify(payload)
       });
       showToast(response.message);
       setSessionCode('');
@@ -1897,7 +2426,58 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
       setCheckoutStatusDetails(response.record);
       loadStudentData();
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        queueOfflineRequest(`/api/sessions/${activeCheckin.session_id}/checkout`, payload);
+        setSessionCode('');
+        setCodeOpen(false);
+      } else {
+        showToast(err.message, 'error');
+      }
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const handleFallbackCheckIn = async (e) => {
+    if (e) e.preventDefault();
+    setCheckingIn(true);
+    const geo = await getCoordinates();
+    const payload = {
+      student_id: fallbackStudentId,
+      session_code: fallbackSessionCode,
+      lat: geo?.lat,
+      lng: geo?.lng,
+      accuracy: geo?.accuracy
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest('/api/student/check-in/fallback', payload);
+      setFallbackOpen(false);
+      setFallbackStudentId('');
+      setFallbackSessionCode('');
+      setCheckingIn(false);
+      return;
+    }
+
+    try {
+      const response = await apiFetch('/api/student/check-in/fallback', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showToast(response.message);
+      setFallbackStudentId('');
+      setFallbackSessionCode('');
+      setFallbackOpen(false);
+      loadStudentData();
+    } catch (err) {
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        queueOfflineRequest('/api/student/check-in/fallback', payload);
+        setFallbackOpen(false);
+        setFallbackStudentId('');
+        setFallbackSessionCode('');
+      } else {
+        showToast(err.message, 'error');
+      }
     } finally {
       setCheckingIn(false);
     }
@@ -1948,6 +2528,13 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
               Enter Code
             </button>
           </div>
+
+          <button
+            onClick={() => setFallbackOpen(true)}
+            className="text-xs text-white/60 hover:text-white underline mt-4 transition"
+          >
+            Camera or scanner not working? Use Student ID & Code fallback
+          </button>
         </div>
       ) : (
         <div className="premium-card p-6 bg-gradient-to-br from-indigo-650 to-indigo-900 text-white border-0 shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center text-center">
@@ -2041,6 +2628,56 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
               <button
                 type="button"
                 onClick={() => setCodeOpen(false)}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={checkingIn}
+                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-sm font-semibold"
+              >
+                Verify
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Fallback Student ID & Short Code Lookup Overlay */}
+      {fallbackOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleFallbackCheckIn} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-2">ID & Short Code Fallback</h3>
+            <p className="text-slate-500 text-xs mb-4">Enter your student ID and the session code shown on the screen to verify.</p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Student ID</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. STU1001"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold"
+                  value={fallbackStudentId}
+                  onChange={e => setFallbackStudentId(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Session Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. ATT-1001"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold"
+                  value={fallbackSessionCode}
+                  onChange={e => setFallbackSessionCode(e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFallbackOpen(false)}
                 className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-semibold"
               >
                 Cancel

@@ -43,7 +43,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date() });
 });
 
+const { autoCloseSessions } = require('./scripts/session-cleanup');
+
 // Run server
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
+  
+  // Run session end auto-close check every minute
+  setInterval(autoCloseSessions, 60 * 1000);
+  autoCloseSessions();
 });

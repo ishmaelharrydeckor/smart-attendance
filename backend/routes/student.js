@@ -135,13 +135,17 @@ router.post('/check-in/qr', checkInLimiter, async (req, res) => {
       }
     }
 
-    // 4. Record attendance
+    // 4. Record attendance with grace period check
+    const timeElapsedMins = Math.max(0, (now - new Date(session.start_time)) / 1000 / 60);
+    const gracePeriod = session.late_grace_period_minutes || 10;
+    const attendanceStatus = timeElapsedMins <= gracePeriod ? 'present' : 'late';
+
     await db.query(
-      `INSERT INTO attendance_records (session_id, student_id, method, gps_lat, gps_lng, ip_address, is_present)
-       VALUES ($1, $2, 'qr', $3, $4, $5, true)
+      `INSERT INTO attendance_records (session_id, student_id, method, gps_lat, gps_lng, ip_address, is_present, attendance_status)
+       VALUES ($1, $2, 'qr', $3, $4, $5, true, $6)
        ON CONFLICT (session_id, student_id)
-       DO UPDATE SET is_present = true, method = 'qr', timestamp = CURRENT_TIMESTAMP`,
-      [session.id, req.user.id, lat || null, lng || null, ipAddress]
+       DO UPDATE SET is_present = true, method = 'qr', timestamp = CURRENT_TIMESTAMP, attendance_status = $6`,
+      [session.id, req.user.id, lat || null, lng || null, ipAddress, attendanceStatus]
     );
 
     res.json({
@@ -212,13 +216,17 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
       }
     }
 
-    // Record attendance
+    // Record attendance with grace period check
+    const timeElapsedMins = Math.max(0, (now - new Date(session.start_time)) / 1000 / 60);
+    const gracePeriod = session.late_grace_period_minutes || 10;
+    const attendanceStatus = timeElapsedMins <= gracePeriod ? 'present' : 'late';
+
     await db.query(
-      `INSERT INTO attendance_records (session_id, student_id, method, gps_lat, gps_lng, ip_address, is_present)
-       VALUES ($1, $2, 'code', $3, $4, $5, true)
+      `INSERT INTO attendance_records (session_id, student_id, method, gps_lat, gps_lng, ip_address, is_present, attendance_status)
+       VALUES ($1, $2, 'code', $3, $4, $5, true, $6)
        ON CONFLICT (session_id, student_id)
-       DO UPDATE SET is_present = true, method = 'code', timestamp = CURRENT_TIMESTAMP`,
-      [session.id, req.user.id, lat || null, lng || null, ipAddress]
+       DO UPDATE SET is_present = true, method = 'code', timestamp = CURRENT_TIMESTAMP, attendance_status = $6`,
+      [session.id, req.user.id, lat || null, lng || null, ipAddress, attendanceStatus]
     );
 
     res.json({
@@ -227,6 +235,92 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
     });
   } catch (error) {
     console.error('Error during code check-in:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 5. Student ID & Short Code Lookup Fallback Check-in (allows students with camera issues to check in)
+router.post('/check-in/fallback', checkInLimiter, async (req, res) => {
+  const { student_id, session_code, lat, lng } = req.body;
+  const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+  if (!student_id || !session_code) {
+    return res.status(400).json({ error: 'Student ID and Session Code are required.' });
+  }
+
+  try {
+    const now = new Date();
+    // 1. Find the student user record
+    const studentRes = await db.query(
+      'SELECT id FROM users WHERE student_id = $1 AND role = \'student\'',
+      [student_id]
+    );
+    if (studentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Student ID not found.' });
+    }
+    const student = studentRes.rows[0];
+
+    // 2. Find active session matching code
+    const sessionResult = await db.query(
+      `SELECT s.*, c.name as course_name, c.code as course_code 
+       FROM sessions s
+       JOIN courses c ON s.course_id = c.id
+       WHERE s.session_code = $1 AND s.is_active = true AND s.end_time > $2`,
+      [session_code, now]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired session code.' });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // 3. Verify enrollment
+    const enrollment = await db.query(
+      'SELECT id FROM course_enrollments WHERE student_id = $1 AND course_id = $2',
+      [student.id, session.course_id]
+    );
+
+    if (enrollment.rows.length === 0) {
+      return res.status(403).json({ error: 'Student is not enrolled in this course.' });
+    }
+
+    // 4. Optional GPS Verification
+    if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
+      const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
+      const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
+      const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
+
+      if (!lat || !lng) {
+        return res.status(400).json({ error: 'GPS coordinates required for verification.' });
+      }
+
+      const distance = getDistanceInMeters(lat, lng, targetLat, targetLng);
+      if (distance > allowedRadius) {
+        return res.status(400).json({ error: 'Verification failed. You are outside the allowed class radius.' });
+      }
+    }
+
+    // 5. Calculate Grace Period Status
+    const timeElapsedMins = Math.max(0, (now - new Date(session.start_time)) / 1000 / 60);
+    const gracePeriod = session.late_grace_period_minutes || 10;
+    const attendanceStatus = timeElapsedMins <= gracePeriod ? 'present' : 'late';
+
+    // 6. Record attendance
+    await db.query(
+      `INSERT INTO attendance_records (session_id, student_id, method, gps_lat, gps_lng, ip_address, is_present, attendance_status)
+       VALUES ($1, $2, 'manual_id_code', $3, $4, $5, true, $6)
+       ON CONFLICT (session_id, student_id)
+       DO UPDATE SET is_present = true, method = 'manual_id_code', timestamp = CURRENT_TIMESTAMP, attendance_status = $6`,
+      [session.id, student.id, lat || null, lng || null, ipAddress, attendanceStatus]
+    );
+
+    res.json({
+      success: true,
+      message: `Checked in successfully for ${session.course_name} (${session.course_code})`
+    });
+  } catch (error) {
+    console.error('Error during fallback check-in:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 // Apply authentication and lecturer role verification to all lecturer endpoints
 router.use(authenticateToken, requireRole('lecturer'));
@@ -202,7 +203,7 @@ router.delete('/courses/:id', async (req, res) => {
 
 // 4. Session Operations
 router.post('/sessions', async (req, res) => {
-  const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng, allowed_radius_meters } = req.body;
+  const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng, allowed_radius_meters, late_grace_period_minutes } = req.body;
   if (!course_id) return res.status(400).json({ error: 'Course ID is required.' });
 
   try {
@@ -218,15 +219,16 @@ router.post('/sessions', async (req, res) => {
     const duration = duration_mins || 10;
     const rotation = qr_rotation_mins || 1;
     const radius = allowed_radius_meters || 200;
+    const gracePeriod = late_grace_period_minutes || 10;
 
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
     const qrExpiresAt = new Date(startTime.getTime() + rotation * 60 * 1000);
 
     const result = await db.query(
-      `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng, allowed_radius_meters, academic_period_id)
-       VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-      [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null, radius, academicPeriodId]
+      `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng, allowed_radius_meters, academic_period_id, late_grace_period_minutes)
+       VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null, radius, academicPeriodId, gracePeriod]
     );
 
     res.status(201).json(result.rows[0]);
@@ -466,6 +468,169 @@ router.get('/students', async (req, res) => {
     res.json(students.rows);
   } catch (error) {
     console.error('Error fetching students:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// CSV Roster Bulk Import & Enrollment
+router.post('/courses/:id/bulk-enroll', async (req, res) => {
+  const { students } = req.body;
+  const courseId = req.params.id;
+
+  if (!Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({ error: 'List of students is required.' });
+  }
+
+  try {
+    const enrolledList = [];
+    const hash = await bcrypt.hash('TempPassword123', 10);
+
+    for (const s of students) {
+      const name = s.name || s.Name;
+      const studentId = s.student_id || s['Student ID'];
+      const level = s.level || s.Level;
+      const email = s.email || s.Email;
+
+      if (!name || !studentId || !level || !email) {
+        continue;
+      }
+
+      // Check duplicate student_id registered under a different email
+      const checkIdResult = await db.query(
+        'SELECT email FROM users WHERE student_id = $1',
+        [studentId]
+      );
+      if (checkIdResult.rows.length > 0 && checkIdResult.rows[0].email !== email) {
+        return res.status(400).json({
+          error: `Student ID ${studentId} is already registered under email ${checkIdResult.rows[0].email}`
+        });
+      }
+
+      // Find or create user
+      let userId;
+      const userResult = await db.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (userResult.rows.length > 0) {
+        userId = userResult.rows[0].id;
+        // Update student_id and level if not set
+        await db.query(
+          'UPDATE users SET student_id = COALESCE(student_id, $1), level = COALESCE(level, $2) WHERE id = $3',
+          [studentId, level.toString(), userId]
+        );
+      } else {
+        const insertUser = await db.query(
+          `INSERT INTO users (name, email, password_hash, role, student_id, level)
+           VALUES ($1, $2, $3, 'student', $4, $5)
+           RETURNING id`,
+          [name, email, hash, studentId, level.toString()]
+        );
+        userId = insertUser.rows[0].id;
+      }
+
+      // Link to course enrollments
+      await db.query(
+        `INSERT INTO course_enrollments (student_id, course_id)
+         VALUES ($1, $2)
+         ON CONFLICT (student_id, course_id) DO NOTHING`,
+        [userId, courseId]
+      );
+
+      enrolledList.push({ name, studentId, email, level });
+    }
+
+    res.json({ success: true, enrolled: enrolledList });
+  } catch (error) {
+    console.error('Error during bulk enrollment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Manual Attendance Override with Audit Logging
+router.post('/sessions/:sessionId/override', async (req, res) => {
+  const { sessionId } = req.params;
+  const { student_id, is_present, attendance_status, reason } = req.body;
+  const lecturerId = req.user.id;
+
+  if (student_id === undefined || is_present === undefined || !reason) {
+    return res.status(400).json({ error: 'Student ID, presence state, and reason are required.' });
+  }
+
+  try {
+    // 1. Get student user db id
+    const studentUserRes = await db.query('SELECT id FROM users WHERE id = $1', [student_id]);
+    if (studentUserRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not found.' });
+    }
+
+    // 2. Fetch existing attendance record
+    const existingRes = await db.query(
+      'SELECT * FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+      [sessionId, student_id]
+    );
+
+    const oldStatus = existingRes.rows.length > 0 
+      ? (existingRes.rows[0].is_present ? existingRes.rows[0].attendance_status : 'absent')
+      : 'absent';
+
+    const newStatus = is_present ? (attendance_status || 'present') : 'absent';
+
+    let recordId;
+    if (existingRes.rows.length === 0) {
+      const insertRes = await db.query(
+        `INSERT INTO attendance_records (session_id, student_id, method, is_present, attendance_status)
+         VALUES ($1, $2, 'manual', $3, $4)
+         RETURNING id`,
+        [sessionId, student_id, is_present, newStatus]
+      );
+      recordId = insertRes.rows[0].id;
+    } else {
+      recordId = existingRes.rows[0].id;
+      await db.query(
+        `UPDATE attendance_records
+         SET is_present = $1, attendance_status = $2, method = 'manual', timestamp = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [is_present, newStatus, recordId]
+      );
+    }
+
+    // 3. Log to audit trail
+    await db.query(
+      `INSERT INTO attendance_audit_logs (record_id, changed_by, old_value, new_value, reason)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [recordId, lecturerId, oldStatus, newStatus, reason]
+    );
+
+    res.json({ success: true, message: 'Attendance overridden successfully.' });
+  } catch (error) {
+    console.error('Error overriding attendance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Fetch Audit Logs for a Session
+router.get('/sessions/:sessionId/audit-logs', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    const logs = await db.query(
+      `SELECT 
+         l.id, l.old_value, l.new_value, l.reason, l.timestamp,
+         u_lecturer.name as changed_by_name,
+         u_student.name as student_name,
+         u_student.student_id as academic_student_id
+       FROM attendance_audit_logs l
+       JOIN attendance_records ar ON l.record_id = ar.id
+       JOIN users u_lecturer ON l.changed_by = u_lecturer.id
+       JOIN users u_student ON ar.student_id = u_student.id
+       WHERE ar.session_id = $1
+       ORDER BY l.timestamp DESC`,
+      [sessionId]
+    );
+    res.json(logs.rows);
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
