@@ -1242,7 +1242,7 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
                 Close
               </button>
             </div>
-            <div id="qr-reader-container" className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
+            <div id="qr-reader-container" ref={scannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
           </div>
         </div>
       )}
