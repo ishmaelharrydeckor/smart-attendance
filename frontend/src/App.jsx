@@ -578,12 +578,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         method: 'POST',
         body: JSON.stringify({
           course_id: selectedCourseForSession,
-          duration_mins: sessionDuration,
-          qr_rotation_mins: qrRotationTime,
+          duration_mins: sessionDuration || 10,
+          qr_rotation_mins: qrRotationTime || 1,
           location_name: locationName,
           gps_lat: lat,
           gps_lng: lng,
-          allowed_radius_meters: sessionRadius
+          allowed_radius_meters: sessionRadius || 200
         })
       });
       setActiveSession(session);
@@ -790,7 +790,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   placeholder="Duration (mins)"
                   className="bg-transparent text-white focus:outline-none w-full"
                   value={sessionDuration}
-                  onChange={e => setSessionDuration(parseInt(e.target.value) || 10)}
+                  onChange={e => setSessionDuration(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                 />
               </div>
               <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
@@ -800,7 +800,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   placeholder="QR Rotation (mins)"
                   className="bg-transparent text-white focus:outline-none w-full"
                   value={qrRotationTime}
-                  onChange={e => setQrRotationTime(parseInt(e.target.value) || 1)}
+                  onChange={e => setQrRotationTime(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                 />
               </div>
               <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
@@ -810,7 +810,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   placeholder="Geofence Radius (meters)"
                   className="bg-transparent text-white focus:outline-none w-full"
                   value={sessionRadius}
-                  onChange={e => setSessionRadius(parseInt(e.target.value) || 200)}
+                  onChange={e => setSessionRadius(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                 />
               </div>
               <button
