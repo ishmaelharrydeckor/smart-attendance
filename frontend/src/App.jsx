@@ -352,7 +352,7 @@ export default function App() {
 
       {!user ? (
         <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} setFallbackOpen={setFallbackOpen} />
-      ) : user.role === 'lecturer' ? (
+      ) : (user.role === 'lecturer' || user.role === 'ta') ? (
         <LecturerConsole
           user={user}
           activeTab={activeTab}
@@ -384,6 +384,8 @@ export default function App() {
 // -------------------------------------------------------------
 function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
   const [isRegister, setIsRegister] = useState(false);
+  const [isStaffRegister, setIsStaffRegister] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -470,6 +472,41 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
     }
   };
 
+  const handleStaffRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+    if (!emailRegex.test(email)) {
+      showToast('Only KNUST email domains (@knust.edu.gh or @st.knust.edu.gh) are allowed.', 'error');
+      setLoading(false);
+      return;
+    }
+
+    if (!inviteCode) {
+      showToast('Invite code is required.', 'error');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/api/auth/register/staff', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          invite_code: inviteCode
+        })
+      });
+      onAuthSuccess(res.token, res.user);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleCourseSelect = (id) => {
     if (selectedCourses.includes(id)) {
       setSelectedCourses(selectedCourses.filter(cid => cid !== id));
@@ -485,11 +522,82 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
           <div className="inline-flex bg-brand-500 text-white p-3.5 rounded-2xl shadow-lg shadow-brand-500/30 mb-4">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight">{isRegister ? 'Student Registration' : 'Sign in to your portal'}</h2>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {isStaffRegister ? 'Staff & TA Registration' : isRegister ? 'Student Registration' : 'Sign in to your portal'}
+          </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Smart Attendance Management System</p>
         </div>
 
-        {isRegister ? (
+        {isStaffRegister ? (
+          <form onSubmit={handleStaffRegister} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Full Name</label>
+              <input
+                type="text"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                placeholder="e.g. Dr. Kwame Nkrumah"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Email Address</label>
+              <input
+                type="email"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                placeholder="lecturer@knust.edu.gh"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none pr-12"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Invite Code</label>
+              <input
+                type="text"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none font-mono uppercase tracking-widest text-center"
+                placeholder="ABC123XY"
+                value={inviteCode}
+                onChange={e => setInviteCode(e.target.value)}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3.5 rounded-xl shadow-lg transition"
+            >
+              {loading ? 'Verifying & Registering...' : 'Complete Staff Register'}
+            </button>
+
+            <p className="text-center text-sm text-slate-500 mt-4">
+              Already have an account?{' '}
+              <button type="button" onClick={() => { setIsRegister(false); setIsStaffRegister(false); }} className="text-brand-600 font-medium hover:underline">Sign in</button>
+            </p>
+          </form>
+        ) : isRegister ? (
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Full Name</label>
@@ -595,7 +703,7 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
 
             <p className="text-center text-sm text-slate-500 mt-4">
               Already have an account?{' '}
-              <button type="button" onClick={() => setIsRegister(false)} className="text-brand-600 font-medium hover:underline">Sign in</button>
+              <button type="button" onClick={() => { setIsRegister(false); setIsStaffRegister(false); }} className="text-brand-600 font-medium hover:underline">Sign in</button>
             </p>
           </form>
         ) : (
@@ -642,7 +750,12 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
 
             <p className="text-center text-sm text-slate-500 mt-4">
               Student checking in for the first time?{' '}
-              <button type="button" onClick={() => setIsRegister(true)} className="text-brand-600 font-medium hover:underline">Register here</button>
+              <button type="button" onClick={() => { setIsRegister(true); setIsStaffRegister(false); }} className="text-brand-600 font-medium hover:underline">Register here</button>
+            </p>
+
+            <p className="text-center text-sm text-slate-500 mt-2">
+              Lecturer or TA with an invite code?{' '}
+              <button type="button" onClick={() => { setIsRegister(false); setIsStaffRegister(true); }} className="text-brand-600 font-medium hover:underline">Register with invite code</button>
             </p>
 
             <div className="text-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -681,6 +794,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
   // Modals / forms
   const [newCourseName, setNewCourseName] = useState('');
+  const [inviteCodes, setInviteCodes] = useState([]);
+  const [inviteRole, setInviteRole] = useState('ta');
+  const [inviteCourseIds, setInviteCourseIds] = useState([]);
+  const [inviteExpiresHours, setInviteExpiresHours] = useState('48');
   const [newCourseCode, setNewCourseCode] = useState('');
   const [createCourseYear, setCreateCourseYear] = useState('2024/2025');
   const [createCourseSemester, setCreateCourseSemester] = useState('2');
@@ -733,6 +850,58 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       if (qrPollInterval.current) clearInterval(qrPollInterval.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'invites') {
+      loadInviteCodes();
+    }
+  }, [activeTab]);
+
+  const loadInviteCodes = async () => {
+    try {
+      const data = await apiFetch('/api/lecturer/invite-codes');
+      setInviteCodes(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleGenerateInvite = async (e) => {
+    e.preventDefault();
+    try {
+      const body = {
+        intended_role: inviteRole,
+        expires_in_hours: parseInt(inviteExpiresHours)
+      };
+      if (inviteRole === 'ta') {
+        if (inviteCourseIds.length === 0) {
+          showToast('Please select at least one course for the TA invite.', 'error');
+          return;
+        }
+        body.course_ids = inviteCourseIds;
+      }
+      const newCode = await apiFetch('/api/lecturer/invite-codes/generate', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      showToast('Invite code generated successfully!');
+      setInviteCourseIds([]);
+      loadInviteCodes();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteInvite = async (id) => {
+    if (!confirm('Are you sure you want to revoke this invite code?')) return;
+    try {
+      await apiFetch(`/api/lecturer/invite-codes/${id}`, { method: 'DELETE' });
+      showToast('Invite code revoked.');
+      loadInviteCodes();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
 
   const handleAddAcademicPeriod = async (e) => {
     e.preventDefault();
@@ -1222,11 +1391,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       <div className="flex gap-2 overflow-x-auto pb-4 border-b border-slate-200 dark:border-slate-800 mb-8">
         {[
           { id: 'dashboard', label: selectedCourseId ? 'Dashboard' : 'My Courses', icon: Users },
-          { id: 'courses', label: 'Manage Courses', icon: BookOpen },
+          user.role === 'lecturer' && { id: 'courses', label: 'Manage Courses', icon: BookOpen },
           selectedCourseId && { id: 'sessions', label: 'Sessions', icon: Calendar },
           activeSession && { id: 'live-session', label: 'Live Active Session', icon: RefreshCw },
-          selectedCourseId && { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
-          { id: 'settings', label: 'Settings', icon: Settings }
+          user.role === 'lecturer' && selectedCourseId && { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
+          user.role === 'lecturer' && { id: 'invites', label: 'Invite & Access', icon: UserPlus },
+          user.role === 'lecturer' && { id: 'settings', label: 'Settings', icon: Settings }
         ].filter(Boolean).map(tab => (
           <button
             key={tab.id}
@@ -2217,6 +2387,177 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                 Add Academic Period
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* INVITES & ACCESS TAB */}
+      {activeTab === 'invites' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
+          <div className="premium-card p-8">
+            <h3 className="text-xl font-bold mb-2">Generate Invite Code</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Create single-use registration codes for other lecturers or course teaching assistants.</p>
+
+            <form onSubmit={handleGenerateInvite} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold mb-1.5">Intended Role</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-sm">
+                    <input
+                      type="radio"
+                      name="inviteRole"
+                      value="ta"
+                      checked={inviteRole === 'ta'}
+                      onChange={() => setInviteRole('ta')}
+                      className="h-4 w-4 text-brand-600"
+                    />
+                    Teaching Assistant (TA)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-sm">
+                    <input
+                      type="radio"
+                      name="inviteRole"
+                      value="lecturer"
+                      checked={inviteRole === 'lecturer'}
+                      onChange={() => setInviteRole('lecturer')}
+                      className="h-4 w-4 text-brand-600"
+                    />
+                    Lecturer
+                  </label>
+                </div>
+              </div>
+
+              {inviteRole === 'ta' && (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Assign Courses (Required for TA)</label>
+                  {courses.length === 0 ? (
+                    <p className="text-xs text-red-500 font-medium">Please create courses first before generating a TA invite.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-100 dark:border-slate-800 p-3 rounded-xl">
+                      {courses.map(course => (
+                        <div
+                          key={course.id}
+                          onClick={() => {
+                            if (inviteCourseIds.includes(course.id)) {
+                              setInviteCourseIds(inviteCourseIds.filter(cid => cid !== course.id));
+                            } else {
+                              setInviteCourseIds([...inviteCourseIds, course.id]);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer border transition ${
+                            inviteCourseIds.includes(course.id)
+                              ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/20'
+                              : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-semibold text-sm">{course.name}</p>
+                            <p className="text-xs text-slate-500">{course.code}</p>
+                          </div>
+                          {inviteCourseIds.includes(course.id) && (
+                            <Check className="w-4 h-4 text-brand-600" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold mb-1.5">Expires In</label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={inviteExpiresHours}
+                  onChange={e => setInviteExpiresHours(e.target.value)}
+                >
+                  <option value="24">24 Hours</option>
+                  <option value="48">48 Hours (Recommended)</option>
+                  <option value="72">72 Hours</option>
+                  <option value="168">1 Week</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3.5 rounded-xl shadow-lg transition"
+              >
+                Generate Invite Code
+              </button>
+            </form>
+          </div>
+
+          <div className="premium-card p-8 flex flex-col justify-between">
+            <div>
+              <h3 className="text-xl font-bold mb-2">Active & Past Invite Codes</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 font-medium">Track redemption status and course permissions for generated links.</p>
+
+              <div className="space-y-3 mb-6 max-h-[420px] overflow-y-auto pr-1">
+                {inviteCodes.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-8">No invite codes generated yet.</p>
+                ) : (
+                  inviteCodes.map(code => {
+                    const isExpired = new Date(code.expires_at) < new Date();
+                    return (
+                      <div key={code.id} className="flex justify-between items-start p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-sm bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 uppercase tracking-widest">{code.code}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              code.intended_role === 'lecturer' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300' : 'bg-pink-100 text-pink-800 dark:bg-pink-950/40 dark:text-pink-300'
+                            }`}>
+                              {code.intended_role === 'lecturer' ? 'Lecturer' : 'TA'}
+                            </span>
+                          </div>
+                          {code.intended_role === 'ta' && (
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5">
+                              Assigned Courses: {(() => {
+                                let cids = [];
+                                try {
+                                  cids = typeof code.course_ids === 'string' ? JSON.parse(code.course_ids) : code.course_ids;
+                                } catch (e) {}
+                                if (!Array.isArray(cids)) cids = [];
+                                return courses
+                                  .filter(c => cids.includes(c.id))
+                                  .map(c => c.code)
+                                  .join(', ') || 'None';
+                              })()}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Expires: {new Date(code.expires_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {code.used ? (
+                            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider" title={`Used by ${code.used_by_name || 'ID ' + code.used_by}`}>
+                              Used
+                            </span>
+                          ) : isExpired ? (
+                            <span className="bg-slate-200 text-slate-600 dark:bg-slate-700/60 dark:text-slate-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                              Expired
+                            </span>
+                          ) : (
+                            <>
+                              <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                                Unused
+                              </span>
+                              <button
+                                onClick={() => handleDeleteInvite(code.id)}
+                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition text-red-500 hover:text-red-755"
+                                title="Revoke Invite"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

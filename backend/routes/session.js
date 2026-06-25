@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const crypto = require('crypto');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireLecturerOrTA, requireCourseAccess } = require('../middleware/auth');
 
 // Get/Poll current active session details (QR token, remaining time, etc.)
-router.get('/:id/qr-status', authenticateToken, async (req, res) => {
+router.get('/:id/qr-status', authenticateToken, requireLecturerOrTA, requireCourseAccess, async (req, res) => {
   try {
     const sessionResult = await db.query(
       `SELECT s.*, c.name as course_name, c.code as course_code
@@ -170,11 +170,8 @@ router.post('/:sessionId/checkout', authenticateToken, async (req, res) => {
   }
 });
 
-// Lecturer Manual Checkout Endpoint (Bulk/Single)
-router.post('/:sessionId/checkout/manual', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'lecturer') {
-    return res.status(403).json({ error: 'Unauthorized.' });
-  }
+// Lecturer/TA Manual Checkout Endpoint (Bulk/Single)
+router.post('/:sessionId/checkout/manual', authenticateToken, requireLecturerOrTA, requireCourseAccess, async (req, res) => {
   const { student_ids } = req.body;
   const { sessionId } = req.params;
   if (!Array.isArray(student_ids) || student_ids.length === 0) {

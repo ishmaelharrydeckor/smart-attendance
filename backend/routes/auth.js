@@ -158,4 +158,114 @@ router.get('/academic-periods', async (req, res) => {
   }
 });
 
+// Staff / TA Registration with Invite Code
+router.post('/register/staff', async (req, res) => {
+  const { name, email, password, invite_code } = req.body;
+
+  if (!name || !email || !password || !invite_code) {
+    return res.status(400).json({ error: 'All fields (name, email, password, invite_code) are required.' });
+  }
+
+  // Validate email matches KNUST pattern
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Only KNUST staff/student email domains (@knust.edu.gh or @st.knust.edu.gh) are allowed.' });
+  }
+
+  try {
+    // Check if email already registered
+    const emailCheck = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (emailCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Email is already registered.' });
+    }
+
+    // Verify invite code
+    const codeRes = await db.query(
+      'SELECT * FROM invite_codes WHERE code = $1',
+      [invite_code]
+    );
+
+    if (codeRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid invite code.' });
+    }
+
+    const invite = codeRes.rows[0];
+
+    if (invite.used) {
+      return res.status(400).json({ error: 'This invite code has already been used.' });
+    }
+
+    if (new Date(invite.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'This invite code has expired.' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    // Start Transaction
+    await db.query('BEGIN');
+
+    // Create user
+    const userRes = await db.query(
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4) RETURNING id, name, email, role`,
+      [name, email, passwordHash, invite.intended_role]
+    );
+
+    const newUser = userRes.rows[0];
+
+    // If intended_role is 'ta', read course_ids from the invite code and assign to course_ta_assignments
+    if (invite.intended_role === 'ta') {
+      let courseIds = [];
+      if (typeof invite.course_ids === 'string') {
+        courseIds = JSON.parse(invite.course_ids);
+      } else if (Array.isArray(invite.course_ids)) {
+        courseIds = invite.course_ids;
+      }
+
+      for (const courseId of courseIds) {
+        await db.query(
+          `INSERT INTO course_ta_assignments (ta_user_id, course_id, assigned_by)
+           VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+          [newUser.id, courseId, invite.created_by]
+        );
+      }
+    }
+
+    // Mark invite code as used
+    await db.query(
+      'UPDATE invite_codes SET used = true, used_by = $1 WHERE id = $2',
+      [newUser.id, invite.id]
+    );
+
+    await db.query('COMMIT');
+
+    // Generate token
+    const token = jwt.sign(
+      { id: newUser.id, role: newUser.role, name: newUser.name, student_id: null },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      message: 'Staff registered successfully',
+      token,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        student_id: null,
+        level: null
+      }
+    });
+
+  } catch (error) {
+    await db.query('ROLLBACK');
+    console.error('Staff registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
