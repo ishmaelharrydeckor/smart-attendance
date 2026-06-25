@@ -591,6 +591,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           showToast('Session checking window closed.', 'info');
           clearInterval(qrPollInterval.current);
           setActiveSession(null);
+          setActiveTab('sessions');
           loadSessions();
           return;
         }
