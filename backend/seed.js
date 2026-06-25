@@ -25,6 +25,16 @@ const seed = async () => {
     const lecturerId = lecturerResult.rows[0].id;
     console.log('Lecturer user created.');
 
+    // Seed Academic Periods
+    const p1 = await db.query(
+      "INSERT INTO academic_periods (academic_year, semester, is_current) VALUES ('2024/2025', 1, false) RETURNING id"
+    );
+    const p2 = await db.query(
+      "INSERT INTO academic_periods (academic_year, semester, is_current) VALUES ('2024/2025', 2, true) RETURNING id"
+    );
+    const currentPeriodId = p2.rows[0].id;
+    console.log('Academic periods seeded.');
+
     // 3. Insert Courses
     const courses = [
       { name: 'Introduction to Computer Science', code: 'CS-101' },
@@ -41,8 +51,8 @@ const seed = async () => {
     const courseIds = [];
     for (const c of courses) {
       const res = await db.query(
-        'INSERT INTO courses (name, code, lecturer_id) VALUES ($1, $2, $3) RETURNING id',
-        [c.name, c.code, lecturerId]
+        'INSERT INTO courses (name, code, lecturer_id, academic_period_id) VALUES ($1, $2, $3, $4) RETURNING id',
+        [c.name, c.code, lecturerId, currentPeriodId]
       );
       courseIds.push(res.rows[0].id);
     }
@@ -104,8 +114,8 @@ const seed = async () => {
       const sessionCode = `ATT-${1000 + j}`;
 
       const sessionRes = await db.query(
-        `INSERT INTO sessions (course_id, date, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO sessions (course_id, date, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, created_by, academic_period_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id, course_id`,
         [
           courseId,
@@ -115,8 +125,9 @@ const seed = async () => {
           qrToken,
           sessionCode,
           isToday,
-          end, // QR expires when session ends
-          lecturerId
+          end, // QR expires at same time as session end for simplicity here
+          lecturerId,
+          currentPeriodId
         ]
       );
       sessions.push(sessionRes.rows[0]);

@@ -27,7 +27,8 @@ import {
   Download,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowLeft
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -37,7 +38,10 @@ const DEFAULT_SETTINGS = {
   minThreshold: 75,
   qrRotationMins: 1,
   gpsRadius: 200,
-  gpsEnabled: false
+  gpsEnabled: false,
+  earlyLeaverThreshold: 15,
+  checkoutWindowMins: 10,
+  frequentEarlyLeaverThreshold: 20
 };
 
 export default function App() {
@@ -53,6 +57,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
+  // Academic Period State
+  const [academicPeriods, setAcademicPeriods] = useState([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState('');
+
   // Global Toast Notification
   const [toast, setToast] = useState(null);
 
@@ -60,6 +68,18 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    if (user && user.role === 'lecturer') {
+      apiFetch('/api/auth/academic-periods')
+        .then(periods => {
+          setAcademicPeriods(periods);
+          const current = periods.find(p => p.is_current) || periods[0];
+          if (current) setSelectedPeriodId(current.id);
+        })
+        .catch(err => console.warn(err.message));
+    }
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem('token', token);
@@ -138,6 +158,19 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {user && user.role === 'lecturer' && academicPeriods.length > 0 && (
+              <select
+                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer font-medium"
+                value={selectedPeriodId}
+                onChange={e => setSelectedPeriodId(e.target.value)}
+              >
+                {academicPeriods.map(p => (
+                  <option key={p.id} value={p.id}>
+                    Semester {p.semester} ({p.academic_year})
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => setDarkMode(!darkMode)}
               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -170,6 +203,8 @@ export default function App() {
           setSettings={setSettings}
           showToast={showToast}
           apiFetch={apiFetch}
+          academicPeriods={academicPeriods}
+          selectedPeriodId={selectedPeriodId}
         />
       ) : (
         <StudentConsole
@@ -442,17 +477,22 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
 }
 
 // -------------------------------------------------------------
-// LECTURER PORTAL CONSOLE
-// -------------------------------------------------------------
-function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch }) {
-  const [stats, setStats] = useState({ totalStudents: 0, presentToday: 0, absentToday: 0, overallPercentage: 100 });
+function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch, academicPeriods, selectedPeriodId }) {
+  const [stats, setStats] = useState({ totalStudents: 0, totalSessions: 0, studentsBelowThreshold: 0, overallPercentage: 100, avgDuration: 0, earlyLeaversCount: 0 });
   const [courses, setCourses] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [flagged, setFlagged] = useState([]);
+  const [flaggedStudents, setFlaggedStudents] = useState([]);
+
+  // Per-course context
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [trends, setTrends] = useState([]);
 
   // Modals / forms
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseCode, setNewCourseCode] = useState('');
+  const [createCourseYear, setCreateCourseYear] = useState('2024/2025');
+  const [createCourseSemester, setCreateCourseSemester] = useState('2');
   const [selectedCourseForSession, setSelectedCourseForSession] = useState('');
   const [sessionDuration, setSessionDuration] = useState(10);
   const [capturingGps, setCapturingGps] = useState(false);
@@ -462,21 +502,72 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [activeSession, setActiveSession] = useState(null);
   const [liveAttendanceList, setLiveAttendanceList] = useState([]);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [checkoutQrCodeUrl, setCheckoutQrCodeUrl] = useState('');
+  const [liveSessionSubMode, setLiveSessionSubMode] = useState('checkin');
+  const [rosterFilter, setRosterFilter] = useState('all');
   const [qrRotationTime, setQrRotationTime] = useState(settings.qrRotationMins);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
   const qrPollInterval = useRef(null);
 
   useEffect(() => {
-    loadStats();
-    loadCourses();
-    loadSessions();
-  }, []);
+    if (selectedPeriodId) {
+      loadCourses();
+      loadSessions();
+      if (selectedCourseId) {
+        loadStats(selectedCourseId);
+        loadTrends(selectedCourseId);
+        loadFlaggedStudents(selectedCourseId);
+      }
+    }
+  }, [selectedPeriodId, selectedCourseId]);
 
-  const loadStats = async () => {
+  useEffect(() => {
+    setSelectedCourseId(null);
+  }, [selectedPeriodId]);
+
+  const loadStats = async (courseId) => {
     try {
-      const data = await apiFetch('/api/lecturer/dashboard-stats');
+      const data = await apiFetch(`/api/lecturer/dashboard-stats?course_id=${courseId}&min_threshold=${settings.minThreshold}`);
       setStats(data);
+    } catch (e) {
+      console.warn(e.message);
+    }
+  };
+
+  const loadFlaggedStudents = async (courseId) => {
+    try {
+      const data = await apiFetch(`/api/lecturer/courses/${courseId}/report`);
+      const studentMap = {};
+      data.forEach(row => {
+        const id = row.academic_student_id;
+        if (!studentMap[id]) {
+          studentMap[id] = {
+            name: row.name,
+            academic_student_id: row.academic_student_id,
+            level: row.level,
+            attended: parseInt(row.attended_sessions) || 0,
+            total: parseInt(row.total_sessions) || 0,
+            early_leavers: parseInt(row.early_leaver_sessions) || 0
+          };
+        }
+      });
+      const students = Object.values(studentMap);
+      const flaggedList = students.filter(s => {
+        const attRate = s.total > 0 ? (s.attended / s.total) * 100 : 100;
+        const earlyRate = s.attended > 0 ? (s.early_leavers / s.attended) * 100 : 0;
+        return attRate < settings.minThreshold || earlyRate > settings.frequentEarlyLeaverThreshold;
+      });
+      setFlaggedStudents(flaggedList);
+    } catch (e) {
+      console.warn(e.message);
+    }
+  };
+
+  const loadTrends = async (courseId) => {
+    try {
+      const data = await apiFetch(`/api/lecturer/attendance-trends?course_id=${courseId}`);
+      setTrends(data);
     } catch (e) {
       console.warn(e.message);
     }
@@ -484,7 +575,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
   const loadCourses = async () => {
     try {
-      const data = await apiFetch('/api/lecturer/courses');
+      const data = await apiFetch(`/api/lecturer/courses?academic_period_id=${selectedPeriodId}`);
       setCourses(data);
       if (data.length > 0) setSelectedCourseForSession(data[0].id);
     } catch (e) {
@@ -494,7 +585,11 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
   const loadSessions = async () => {
     try {
-      const data = await apiFetch('/api/lecturer/sessions');
+      let url = `/api/lecturer/sessions?academic_period_id=${selectedPeriodId}`;
+      if (selectedCourseId) {
+        url += `&course_id=${selectedCourseId}`;
+      }
+      const data = await apiFetch(url);
       setSessions(data);
       const active = data.find(s => s.is_active);
       if (active) {
@@ -522,9 +617,19 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const createCourse = async (e) => {
     e.preventDefault();
     try {
+      const matchedPeriod = academicPeriods.find(
+        p => p.academic_year === createCourseYear && p.semester === parseInt(createCourseSemester)
+      );
+      const periodId = matchedPeriod ? matchedPeriod.id : selectedPeriodId;
+      if (!periodId) return showToast('Please select a valid academic period', 'error');
+
       await apiFetch('/api/lecturer/courses', {
         method: 'POST',
-        body: JSON.stringify({ name: newCourseName, code: newCourseCode })
+        body: JSON.stringify({ 
+          name: newCourseName, 
+          code: newCourseCode, 
+          academic_period_id: periodId 
+        })
       });
       showToast('Course created successfully');
       setNewCourseName('');
@@ -549,7 +654,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   };
 
   const startSession = async () => {
-    if (!selectedCourseForSession) return showToast('Please select a course', 'error');
+    const courseId = selectedCourseForSession || selectedCourseId;
+    if (!courseId) return showToast('Please select a course', 'error');
     
     let locationName = 'Lecturer Live Location';
     let lat = null;
@@ -578,7 +684,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       const session = await apiFetch('/api/lecturer/sessions', {
         method: 'POST',
         body: JSON.stringify({
-          course_id: selectedCourseForSession,
+          course_id: courseId,
           duration_mins: sessionDuration || 10,
           qr_rotation_mins: qrRotationTime || 1,
           location_name: locationName,
@@ -620,6 +726,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         const qrUrl = await QRCode.toDataURL(appUrl, { width: 400, margin: 2 });
         setQrCodeUrl(qrUrl);
 
+        if (status.checkout_qr_token) {
+          const checkoutAppUrl = `${window.location.origin}/check-out?qr=${status.checkout_qr_token}`;
+          const outQrUrl = await QRCode.toDataURL(checkoutAppUrl, { width: 400, margin: 2 });
+          setCheckoutQrCodeUrl(outQrUrl);
+        }
+
         // Fetch attendance live lists
         const list = await apiFetch(`/api/lecturer/sessions/${sessionId}/live-attendance`);
         setLiveAttendanceList(list);
@@ -641,6 +753,36 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       });
       showToast('Attendance updated successfully');
       // reload live list
+      const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
+      setLiveAttendanceList(list);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const activateCheckout = async () => {
+    try {
+      const res = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/activate-checkout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          checkout_window_minutes: settings.checkoutWindowMins,
+          early_leaver_threshold_minutes: settings.earlyLeaverThreshold
+        })
+      });
+      setActiveSession(res);
+      showToast('Checkout window activated successfully!');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const manualCheckoutStudent = async (studentId) => {
+    try {
+      await apiFetch(`/api/sessions/${activeSession.id}/checkout/manual`, {
+        method: 'POST',
+        body: JSON.stringify({ student_ids: [studentId] })
+      });
+      showToast('Student checked out manually.');
       const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
       setLiveAttendanceList(list);
     } catch (err) {
@@ -682,11 +824,11 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       {/* Tab Switchers */}
       <div className="flex gap-2 overflow-x-auto pb-4 border-b border-slate-200 dark:border-slate-800 mb-8">
         {[
-          { id: 'dashboard', label: 'Dashboard', icon: Users },
+          { id: 'dashboard', label: selectedCourseId ? 'Dashboard' : 'My Courses', icon: Users },
           { id: 'courses', label: 'Manage Courses', icon: BookOpen },
-          { id: 'sessions', label: 'Sessions', icon: Calendar },
+          selectedCourseId && { id: 'sessions', label: 'Sessions', icon: Calendar },
           activeSession && { id: 'live-session', label: 'Live Active Session', icon: RefreshCw },
-          { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
+          selectedCourseId && { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
           { id: 'settings', label: 'Settings', icon: Settings }
         ].filter(Boolean).map(tab => (
           <button
@@ -706,102 +848,332 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
       {/* DASHBOARD TAB */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="premium-card p-6 flex items-center justify-between">
+        selectedCourseId === null ? (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm font-semibold text-slate-500">Total Enrolled</p>
-                <h3 className="text-3xl font-bold mt-1">{stats.totalStudents}</h3>
-              </div>
-              <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-2xl text-blue-600 dark:text-blue-400">
-                <Users className="w-6 h-6" />
+                <h2 className="text-2xl font-bold tracking-tight">My Courses</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Select a course to view detailed statistics and start attendance sessions.</p>
               </div>
             </div>
-            <div className="premium-card p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Present Today</p>
-                <h3 className="text-3xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{stats.presentToday}</h3>
+
+            {courses.length === 0 ? (
+              <div className="text-center p-16 premium-card border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center">
+                <BookOpen className="w-12 h-12 text-slate-400 mb-4" />
+                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No courses in this semester</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Go to the "Manage Courses" tab to create courses for the selected semester.</p>
               </div>
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-2xl text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-6 h-6" />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courses.map(course => {
+                  const levelMatch = course.code.match(/\d/);
+                  const calculatedLevel = levelMatch ? levelMatch[0] + '00' : 'Undergrad';
+                  
+                  return (
+                    <div key={course.id} className="premium-card p-6 flex flex-col justify-between hover:shadow-xl hover:border-brand-500/30 transition-all duration-300 group">
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 px-3 py-1 rounded-lg">
+                            {course.code}
+                          </span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {calculatedLevel} Level
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-lg leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                          {course.name}
+                        </h3>
+                      </div>
+                      
+                      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
+                        <div>
+                          <p className="text-slate-400 text-xs">Enrolled</p>
+                          <p className="font-bold text-slate-700 dark:text-slate-300">{course.enrolled_count || 0} Students</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-slate-400 text-xs">Attendance</p>
+                          <p className={`font-bold ${
+                            course.overall_attendance_rate < settings.minThreshold ? 'text-red-500' : 'text-emerald-500'
+                          }`}>{course.overall_attendance_rate}%</p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedCourseId(course.id)}
+                        className="w-full mt-5 bg-slate-105 dark:bg-slate-800 hover:bg-brand-600 hover:text-white dark:hover:bg-brand-600 font-semibold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-1"
+                      >
+                        View Dashboard <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            <div className="premium-card p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Absent Today</p>
-                <h3 className="text-3xl font-bold mt-1 text-red-500">{stats.absentToday}</h3>
-              </div>
-              <div className="bg-red-50 dark:bg-red-950/40 p-4 rounded-2xl text-red-600 dark:text-red-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-            </div>
-            <div className="premium-card p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Overall Attendance</p>
-                <h3 className="text-3xl font-bold mt-1">{stats.overallPercentage}%</h3>
-              </div>
-              <div className="bg-brand-50 dark:bg-brand-950/40 p-4 rounded-2xl text-brand-600 dark:text-brand-400">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* Quick Session starter */}
-          <div className="premium-card p-8 bg-gradient-to-br from-brand-600 to-indigo-700 text-white border-0 shadow-lg shadow-brand-500/10">
-            <h3 className="text-xl font-bold">Start a New Attendance Session</h3>
-            <p className="text-white/80 text-sm mt-1">Select a course to generate a dynamic time-limited QR-code and self-checkin code.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mt-6">
-              <select
-                className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white outline-none"
-                value={selectedCourseForSession}
-                onChange={e => setSelectedCourseForSession(e.target.value)}
-              >
-                <option value="" className="text-slate-900">Select Course</option>
-                {courses.map(c => (
-                  <option key={c.id} value={c.id} className="text-slate-900">{c.code} - {c.name}</option>
-                ))}
-              </select>
-
-              <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-                <Clock className="w-4 h-4 mr-2" />
-                <input
-                  type="number"
-                  placeholder="Duration (mins)"
-                  className="bg-transparent text-white focus:outline-none w-full"
-                  value={sessionDuration}
-                  onChange={e => setSessionDuration(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                />
-              </div>
-              <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                <input
-                  type="number"
-                  placeholder="QR Rotation (mins)"
-                  className="bg-transparent text-white focus:outline-none w-full"
-                  value={qrRotationTime}
-                  onChange={e => setQrRotationTime(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                />
-              </div>
-              <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
-                <MapPin className="w-4 h-4 mr-2" />
-                <input
-                  type="number"
-                  placeholder="Geofence Radius (meters)"
-                  className="bg-transparent text-white focus:outline-none w-full"
-                  value={sessionRadius}
-                  onChange={e => setSessionRadius(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                />
-              </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Breadcrumb / Back button */}
+            <div className="flex items-center gap-4">
               <button
-                onClick={startSession}
-                disabled={capturingGps}
-                className="bg-white text-brand-600 font-bold px-6 py-3.5 rounded-xl hover:bg-slate-100 transition shadow-lg disabled:opacity-50"
+                onClick={() => setSelectedCourseId(null)}
+                className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition"
               >
-                {capturingGps ? 'Capturing GPS...' : 'Launch Session'}
+                <ArrowLeft className="w-4 h-4" /> Back to My Courses
               </button>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <h2 className="text-xl font-bold tracking-tight">
+                {courses.find(c => c.id === selectedCourseId)?.code} - {courses.find(c => c.id === selectedCourseId)?.name}
+              </h2>
             </div>
+
+            {/* Course-scoped stats cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500">Total Enrolled</p>
+                  <h3 className="text-3xl font-bold mt-1">{stats.totalStudents}</h3>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-2xl text-blue-600 dark:text-blue-400">
+                  <Users className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500">Below Flag</p>
+                  <h3 className="text-3xl font-bold mt-1 text-red-550">{stats.studentsBelowThreshold}</h3>
+                </div>
+                <div className="bg-red-50 dark:bg-red-950/40 p-4 rounded-2xl text-red-650 dark:text-red-400">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500">Total Sessions</p>
+                  <h3 className="text-3xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">{stats.totalSessions}</h3>
+                </div>
+                <div className="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-2xl text-indigo-650 dark:text-indigo-400">
+                  <Calendar className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500 font-medium">Overall Att.</p>
+                  <h3 className="text-3xl font-bold mt-1">{stats.overallPercentage}%</h3>
+                </div>
+                <div className="bg-brand-50 dark:bg-brand-950/40 p-4 rounded-2xl text-brand-600 dark:text-brand-400">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500 font-medium">Avg Duration</p>
+                  <h3 className="text-3xl font-bold mt-1 text-sky-600 dark:text-sky-400">{stats.avgDuration || 0}m</h3>
+                </div>
+                <div className="bg-sky-50 dark:bg-sky-950/40 p-4 rounded-2xl text-sky-600 dark:text-sky-400">
+                  <Clock className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="premium-card p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500 font-medium">Early Leavers</p>
+                  <h3 className="text-3xl font-bold mt-1 text-orange-550">{stats.earlyLeaversCount || 0}</h3>
+                </div>
+                <div className="bg-orange-50 dark:bg-orange-950/40 p-4 rounded-2xl text-orange-650 dark:text-orange-400">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+
+            {/* Grid for Trend Chart & Launch Session */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Trend Chart (SVG) */}
+              <div className="lg:col-span-2 premium-card p-6 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-lg font-bold mb-1">Attendance Trend</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Attendance percentage over the last 10 sessions.</p>
+                </div>
+                
+                {trends.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-450 text-sm">
+                    No session trend data available yet.
+                  </div>
+                ) : (
+                  <div className="relative w-full h-64">
+                    {/* SVG Bar Chart */}
+                    <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      {[0, 25, 50, 75, 100].map((level, i) => {
+                        const y = 170 - (level * 150) / 100;
+                        return (
+                          <g key={level}>
+                            <line x1="40" y1={y} x2="480" y2={y} className="stroke-slate-100 dark:stroke-slate-800/80" strokeWidth="1" strokeDasharray="4 4" />
+                            <text x="30" y={y + 4} className="text-[10px] font-medium fill-slate-400 text-right" textAnchor="end">{level}%</text>
+                          </g>
+                        );
+                      })}
+                      
+                      {/* Bars */}
+                      {trends.map((item, idx) => {
+                        const barCount = trends.length;
+                        const spacing = 400 / barCount;
+                        const width = Math.min(24, spacing * 0.6);
+                        const x = 50 + idx * spacing + (spacing - width) / 2;
+                        const height = (item.attendance_rate * 150) / 100;
+                        const y = 170 - height;
+                        
+                        return (
+                          <g key={idx} className="group cursor-pointer">
+                            {/* Bar with gradient fill */}
+                            <rect
+                              x={x}
+                              y={y}
+                              width={width}
+                              height={height}
+                              rx="4"
+                              className="fill-brand-500 dark:fill-brand-600 opacity-85 hover:opacity-100 transition-opacity duration-200"
+                            />
+                            {/* Tooltip or rate label above bar */}
+                            <text
+                              x={x + width / 2}
+                              y={y - 6}
+                              className="text-[9px] font-bold fill-brand-600 dark:fill-brand-400 opacity-0 group-hover:opacity-100 transition-opacity text-center"
+                              textAnchor="middle"
+                            >
+                              {Math.round(item.attendance_rate)}%
+                            </text>
+                            {/* X-axis label (date) */}
+                            <text
+                              x={x + width / 2}
+                              y="188"
+                              className="text-[9px] font-medium fill-slate-400"
+                              textAnchor="middle"
+                              transform={`rotate(-15, ${x + width / 2}, 188)`}
+                            >
+                              {new Date(item.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                            </text>
+                          </g>
+                        );
+                      })}
+                      
+                      {/* Base line */}
+                      <line x1="40" y1="170" x2="480" y2="170" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Course-preselected Launch Session panel */}
+              <div className="premium-card p-6 flex flex-col justify-between bg-gradient-to-br from-brand-600 to-indigo-700 text-white border-0 shadow-xl shadow-brand-500/10">
+                <div>
+                  <h3 className="text-lg font-bold">Launch Session</h3>
+                  <p className="text-white/80 text-xs mt-1">Start a temporary checking session for this course using dynamic geofenced QR code validation.</p>
+                  
+                  <div className="space-y-4 mt-6">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-white/60 mb-1">Session Duration</label>
+                      <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <input
+                          type="number"
+                          placeholder="Duration (mins)"
+                          className="bg-transparent text-white placeholder-white/50 focus:outline-none w-full text-sm font-semibold"
+                          value={sessionDuration}
+                          onChange={e => setSessionDuration(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-white/60 mb-1">QR Code Rotation</label>
+                      <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        <input
+                          type="number"
+                          placeholder="QR Rotation (mins)"
+                          className="bg-transparent text-white placeholder-white/50 focus:outline-none w-full text-sm font-semibold"
+                          value={qrRotationTime}
+                          onChange={e => setQrRotationTime(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-white/60 mb-1">Geofence Radius</label>
+                      <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+                        <MapPin className="w-4 h-4 mr-2" />
+                        <input
+                          type="number"
+                          placeholder="Radius (meters)"
+                          className="bg-transparent text-white placeholder-white/50 focus:outline-none w-full text-sm font-semibold"
+                          value={sessionRadius}
+                          onChange={e => setSessionRadius(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={startSession}
+                  disabled={capturingGps}
+                  className="w-full mt-6 bg-white text-brand-600 font-bold py-3.5 rounded-xl hover:bg-slate-100 transition shadow-lg disabled:opacity-50 text-sm"
+                >
+                  {capturingGps ? 'Capturing GPS Location...' : 'Start Session Now'}
+                </button>
+              </div>
+            </div>
+
+            {/* Flagged Students Section */}
+            <div className="premium-card p-6 mt-8">
+              <h3 className="text-lg font-bold mb-2">Flagged Students</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Students flagged for low attendance or frequent early check-outs.</p>
+              
+              {flaggedStudents.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">No flagged students in this course.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-slate-500 text-xs font-bold uppercase">
+                        <th className="p-3">Student Name</th>
+                        <th className="p-3">Student ID</th>
+                        <th className="p-3">Attendance Rate</th>
+                        <th className="p-3">Early Leaver Rate</th>
+                        <th className="p-3 text-right">Flags</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-sm">
+                      {flaggedStudents.map((stud, idx) => {
+                        const attRate = stud.total > 0 ? Math.round((stud.attended / stud.total) * 100) : 100;
+                        const earlyRate = stud.attended > 0 ? Math.round((stud.early_leavers / stud.attended) * 100) : 0;
+                        const lowAtt = attRate < settings.minThreshold;
+                        const freqEarly = earlyRate > settings.frequentEarlyLeaverThreshold;
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td className="p-3 font-semibold">{stud.name}</td>
+                            <td className="p-3">{stud.academic_student_id}</td>
+                            <td className={`p-3 font-bold ${lowAtt ? 'text-red-500' : 'text-emerald-500'}`}>{attRate}%</td>
+                            <td className={`p-3 font-bold ${freqEarly ? 'text-red-500' : 'text-slate-500'}`}>{earlyRate}%</td>
+                            <td className="p-3 text-right space-x-1">
+                              {lowAtt && (
+                                <span className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg">Low Attendance</span>
+                              )}
+                              {freqEarly && (
+                                <span className="bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-2 py-1 rounded-lg">Frequent Early Leaver</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
           </div>
-        </div>
+        )
       )}
 
       {/* MANAGE COURSES TAB */}
@@ -827,10 +1199,32 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   type="text"
                   required
                   placeholder="e.g. Software Engineering Principles"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none animate-all"
                   value={newCourseName}
                   onChange={e => setNewCourseName(e.target.value)}
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Academic Year</label>
+                <select
+                  value={createCourseYear}
+                  onChange={e => setCreateCourseYear(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium dark:text-white"
+                >
+                  <option value="2024/2025" className="text-slate-900">2024/2025</option>
+                  <option value="2025/2026" className="text-slate-900">2025/2026</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Semester</label>
+                <select
+                  value={createCourseSemester}
+                  onChange={e => setCreateCourseSemester(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium dark:text-white"
+                >
+                  <option value="1" className="text-slate-900">Semester 1</option>
+                  <option value="2" className="text-slate-900">Semester 2</option>
+                </select>
               </div>
               <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-xl hover:bg-brand-700 transition">
                 Create Course
@@ -880,7 +1274,9 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <th className="p-4">Date</th>
                   <th className="p-4">Course</th>
                   <th className="p-4">Session Code</th>
-                  <th className="p-4">Present Students</th>
+                  <th className="p-4">Attendance Stats</th>
+                  <th className="p-4">Avg Duration</th>
+                  <th className="p-4">Early Leavers</th>
                   <th className="p-4">Status</th>
                 </tr>
               </thead>
@@ -890,7 +1286,15 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                     <td className="p-4">{new Date(s.date).toLocaleDateString()}</td>
                     <td className="p-4 font-semibold">{s.course_code}</td>
                     <td className="p-4"><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{s.session_code}</code></td>
-                    <td className="p-4">{s.present_count || 0} present</td>
+                    <td className="p-4">
+                      <div className="text-xs">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">Checked In: {s.present_count || 0}</span>
+                        {s.checked_out_count > 0 && <span className="text-emerald-600 font-medium ml-2">Checked Out: {s.checked_out_count}</span>}
+                        {s.not_checked_out_count > 0 && <span className="text-orange-550 font-medium ml-2">Still In: {s.not_checked_out_count}</span>}
+                      </div>
+                    </td>
+                    <td className="p-4 font-medium">{s.avg_duration_minutes || 0} mins</td>
+                    <td className="p-4 text-orange-550 font-bold">{s.early_leavers_count || 0}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${s.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
                         {s.is_active ? 'Active' : 'Closed'}
@@ -908,27 +1312,90 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       {activeTab === 'live-session' && activeSession && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="premium-card p-6 flex flex-col items-center justify-center text-center">
-            <h3 className="text-xl font-bold mb-2">Check-in QR Code</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Rotates every {qrRotationTime} min to prevent sharing</p>
-
-            {qrCodeUrl ? (
-              <img src={qrCodeUrl} alt="Session QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
-            ) : (
-              <div className="w-64 h-64 border flex items-center justify-center mb-4">Loading QR Code...</div>
-            )}
-
-            <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
-              <div>
-                <p className="text-slate-500 text-xs">Self Check-in Code</p>
-                <p className="font-bold text-lg text-brand-600">{activeSession.session_code}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-slate-500 text-xs">Time Remaining</p>
-                <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
-              </div>
+            
+            {/* Sub-tab selection */}
+            <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 w-full">
+              <button
+                onClick={() => setLiveSessionSubMode('checkin')}
+                className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
+                  liveSessionSubMode === 'checkin' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
+                }`}
+              >
+                Check-in
+              </button>
+              <button
+                onClick={() => setLiveSessionSubMode('checkout')}
+                className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
+                  liveSessionSubMode === 'checkout' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
+                }`}
+              >
+                Check-out
+              </button>
             </div>
 
-            <div className="flex gap-2 w-full">
+            {liveSessionSubMode === 'checkin' ? (
+              <>
+                <h3 className="text-xl font-bold mb-2">Check-in QR Code</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Rotates every {qrRotationTime} min to prevent sharing</p>
+
+                {qrCodeUrl ? (
+                  <img src={qrCodeUrl} alt="Session QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
+                ) : (
+                  <div className="w-64 h-64 border flex items-center justify-center mb-4">Loading QR Code...</div>
+                )}
+
+                <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
+                  <div>
+                    <p className="text-slate-500 text-xs">Self Check-in Code</p>
+                    <p className="font-bold text-lg text-brand-600">{activeSession.session_code}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-500 text-xs">Time Remaining</p>
+                    <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              !activeSession.checkout_qr_token ? (
+                <div className="py-6 px-4 flex flex-col items-center justify-center text-center">
+                  <AlertCircle className="w-12 h-12 text-indigo-500 mb-3 animate-pulse" />
+                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Check-out is Inactive</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5 leading-normal">
+                    Students cannot check out yet. Activate to generate checkout QR code and session code.
+                  </p>
+                  <button
+                    onClick={activateCheckout}
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-lg w-full"
+                  >
+                    Activate Check-out Mode
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-xl font-bold mb-2">Check-out QR Code</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Scan to record checkout timestamp</p>
+
+                  {checkoutQrCodeUrl ? (
+                    <img src={checkoutQrCodeUrl} alt="Checkout QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
+                  ) : (
+                    <div className="w-64 h-64 border flex items-center justify-center mb-4">Generating QR...</div>
+                  )}
+
+                  <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
+                    <div>
+                      <p className="text-slate-500 text-xs">Checkout Code</p>
+                      <p className="font-bold text-lg text-indigo-650">{activeSession.checkout_session_code}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-slate-500 text-xs">Time Remaining</p>
+                      <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
+                    </div>
+                  </div>
+                </>
+              )
+            )}
+
+            <div className="flex gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
               <label className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-3.5 rounded-xl transition cursor-pointer text-center text-sm">
                 <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
                 Upload CSV Checkin
@@ -956,12 +1423,37 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           </div>
 
           <div className="md:col-span-2 premium-card p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold">Attendance Live Roster ({liveAttendanceList.filter(l => l.is_present).length} / {liveAttendanceList.length})</h3>
-              <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-lg font-bold">Attendance Live Roster</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Total present: {liveAttendanceList.filter(l => l.is_present).length} / {liveAttendanceList.length}</p>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-center">
                 <span className="h-3.5 w-3.5 bg-emerald-500 rounded-full animate-ping"></span>
                 <span className="text-xs font-semibold text-slate-400">Live Updating</span>
               </div>
+            </div>
+
+            {/* Roster tab list filter */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+              {[
+                { id: 'all', label: `Checked In (${liveAttendanceList.filter(l => l.is_present).length})` },
+                { id: 'checked_out', label: `Checked Out (${liveAttendanceList.filter(l => l.is_present && l.checkout_timestamp).length})` },
+                { id: 'still_in', label: `Still In (${liveAttendanceList.filter(l => l.is_present && !l.checkout_timestamp).length})` },
+                { id: 'absent', label: `Absent (${liveAttendanceList.filter(l => !l.is_present).length})` }
+              ].map(subTab => (
+                <button
+                  key={subTab.id}
+                  onClick={() => setRosterFilter(subTab.id)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0 ${
+                    rosterFilter === subTab.id
+                      ? 'bg-brand-600 text-white shadow-md'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                  }`}
+                >
+                  {subTab.label}
+                </button>
+              ))}
             </div>
 
             <div className="overflow-y-auto max-h-[500px]">
@@ -970,32 +1462,71 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-slate-500 text-xs font-bold uppercase">
                     <th className="p-3">Student</th>
                     <th className="p-3">ID</th>
-                    <th className="p-3">Level</th>
                     <th className="p-3">Method</th>
-                    <th className="p-3 text-right">Status</th>
+                    <th className="p-3">Duration</th>
+                    <th className="p-3 text-right">Status / Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {liveAttendanceList.map(item => (
-                    <tr key={item.student_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-sm">
-                      <td className="p-3 font-semibold">{item.name}</td>
-                      <td className="p-3">{item.academic_student_id}</td>
-                      <td className="p-3">{item.level}</td>
-                      <td className="p-3 text-slate-400 capitalize">{item.method || '-'}</td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => toggleAttendanceStatus(item.student_id, item.is_present)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                            item.is_present
-                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700'
-                              : 'bg-red-50 dark:bg-red-950/30 text-red-600'
-                          }`}
-                        >
-                          {item.is_present ? 'Present' : 'Absent'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {liveAttendanceList.filter(item => {
+                    if (rosterFilter === 'all') return item.is_present;
+                    if (rosterFilter === 'checked_out') return item.is_present && item.checkout_timestamp;
+                    if (rosterFilter === 'still_in') return item.is_present && !item.checkout_timestamp;
+                    if (rosterFilter === 'absent') return !item.is_present;
+                    return true;
+                  }).map(item => {
+                    const hasCheckedOut = item.checkout_timestamp !== null;
+                    const durationStr = item.duration_minutes !== null ? `${item.duration_minutes}m` : '-';
+                    const methodStr = hasCheckedOut ? `${item.method} / ${item.checkout_method}` : (item.method || '-');
+                    
+                    return (
+                      <tr key={item.student_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-sm">
+                        <td className="p-3 font-semibold">{item.name}</td>
+                        <td className="p-3">{item.academic_student_id}</td>
+                        <td className="p-3 text-slate-400 capitalize text-xs">{methodStr}</td>
+                        <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{durationStr}</td>
+                        <td className="p-3 text-right space-x-2">
+                          {!item.is_present ? (
+                            <button
+                              onClick={() => toggleAttendanceStatus(item.student_id, item.is_present)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-950/30 text-red-650 hover:bg-red-100 transition"
+                            >
+                              Absent
+                            </button>
+                          ) : (
+                            <>
+                              {hasCheckedOut ? (
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                  item.attendance_status === 'early_leaver' 
+                                    ? 'bg-orange-150 dark:bg-orange-950/45 text-orange-700' 
+                                    : 'bg-emerald-100 dark:bg-emerald-950/45 text-emerald-700'
+                                }`}>
+                                  {item.attendance_status === 'early_leaver' ? 'Early Leaver' : 'Checked Out'}
+                                </span>
+                              ) : (
+                                <div className="inline-flex gap-2">
+                                  {activeSession.checkout_qr_token && (
+                                    <button
+                                      onClick={() => manualCheckoutStudent(item.student_id)}
+                                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 hover:bg-indigo-100 transition"
+                                    >
+                                      Force Checkout
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => toggleAttendanceStatus(item.student_id, item.is_present)}
+                                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-650 transition"
+                                  >
+                                    Present
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1057,6 +1588,43 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
             </div>
 
             <div>
+              <label className="block text-sm font-semibold mb-1">Early Leaver Threshold (Minutes)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                value={settings.earlyLeaverThreshold}
+                onChange={e => setSettings({ ...settings, earlyLeaverThreshold: parseInt(e.target.value) || 0 })}
+              />
+              <p className="text-xs text-slate-500 mt-1">Students checking out before this duration from session end will be flagged as early leavers.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Checkout Window Available Time (Minutes before session ends)</label>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                value={settings.checkoutWindowMins}
+                onChange={e => setSettings({ ...settings, checkoutWindowMins: parseInt(e.target.value) || 0 })}
+              />
+              <p className="text-xs text-slate-500 mt-1">Allows student self check-out this many minutes before class scheduled end time.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Frequent Early Leaver Flag Threshold (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                value={settings.frequentEarlyLeaverThreshold}
+                onChange={e => setSettings({ ...settings, frequentEarlyLeaverThreshold: parseInt(e.target.value) || 0 })}
+              />
+              <p className="text-xs text-slate-500 mt-1">Flag students checked out early for more than this percentage of their attended classes.</p>
+            </div>
+
+            <div>
               <div className="flex justify-between items-center">
                 <div>
                   <label className="block text-sm font-semibold">GPS On-Campus Verification</label>
@@ -1094,12 +1662,16 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
       const data = await apiFetch(`/api/lecturer/courses/${course.id}/report`);
       
       let csvContent = 'data:text/csv;charset=utf-8,';
-      csvContent += 'Student Name,Student ID,Level,Sessions Attended,Total Sessions,Attendance Rate,Flagged Status\n';
+      csvContent += 'Student Name,Student ID,Level,Session Date,Session Code,Check-in Time,Check-out Time,Duration (mins),Status,Overall Attendance Rate,Overall Early Leaver %\n';
       
       data.forEach(row => {
         const rate = row.total_sessions > 0 ? Math.round((row.attended_sessions / row.total_sessions) * 100) : 100;
-        const status = rate < settings.minThreshold ? 'FLAGGED' : 'OK';
-        csvContent += `"${row.name}","${row.academic_student_id}","${row.level}",${row.attended_sessions},${row.total_sessions},${rate}%,${status}\n`;
+        const earlyLeaverRate = row.attended_sessions > 0 ? Math.round((row.early_leaver_sessions / row.attended_sessions) * 100) : 0;
+        const checkinStr = row.checkin_time ? new Date(row.checkin_time).toLocaleTimeString() : 'N/A';
+        const checkoutStr = row.checkout_time ? new Date(row.checkout_time).toLocaleTimeString() : 'N/A';
+        const durationStr = row.duration_minutes !== null ? row.duration_minutes : 'N/A';
+        const statusStr = row.attendance_status || 'N/A';
+        csvContent += `"${row.name}","${row.academic_student_id}","${row.level}","${row.session_date ? new Date(row.session_date).toLocaleDateString() : 'N/A'}","${row.session_code || 'N/A'}","${checkinStr}","${checkoutStr}",${durationStr},"${statusStr}",${rate}%,${earlyLeaverRate}%\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
@@ -1146,6 +1718,10 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
   const [sessionCode, setSessionCode] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
 
+  // Checkout additions
+  const [isCheckoutAction, setIsCheckoutAction] = useState(false);
+  const [checkoutStatusDetails, setCheckoutStatusDetails] = useState(null);
+
   const scannerRef = useRef(null);
   const scannerInstance = useRef(null);
 
@@ -1161,7 +1737,6 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
       const historyData = await apiFetch('/api/student/history');
       setHistory(historyData);
     } catch (e) {
-      // Offline fallback/mock if DB query fails during local load check
       setCourses([
         { id: 1, name: 'Introduction to Computer Science', code: 'CS-101', attended: 4, total_sessions: 5 },
         { id: 2, name: 'Software Engineering Principles', code: 'CS-301', attended: 2, total_sessions: 5 }
@@ -1169,7 +1744,13 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
     }
   };
 
-  // Geo coordinate extractor
+  // Find check-in without check-out
+  const activeCheckin = history.find(log => 
+    log.is_present && 
+    !log.checkout_timestamp &&
+    (new Date() - new Date(log.timestamp)) < 4 * 60 * 60 * 1000 // Checked in within last 4 hours
+  );
+
   const getCoordinates = () => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) return resolve(null);
@@ -1189,8 +1770,8 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
     });
   };
 
-  // Launch camera scan
-  const startCameraScan = async () => {
+  const startCameraScan = async (isCheckout = false) => {
+    setIsCheckoutAction(isCheckout);
     setScannerOpen(true);
     setTimeout(() => {
       if (!scannerRef.current) return;
@@ -1200,7 +1781,6 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         false
       );
       scannerInstance.current.render(async (decodedText) => {
-        // Stop scanning
         try {
           scannerInstance.current.clear();
         } catch (e) {
@@ -1208,7 +1788,6 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         }
         setScannerOpen(false);
         
-        // Extract token safely (handling full URLs or plain tokens)
         let token = decodedText;
         try {
           if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
@@ -1221,8 +1800,11 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
 
         if (!token) return showToast('Invalid QR Code format scanned', 'error');
 
-        // Send check-in request
-        handleQrCheckIn(token);
+        if (isCheckout) {
+          handleQrCheckOut(token);
+        } else {
+          handleQrCheckIn(token);
+        }
       }, (error) => {
         // Silence console scanner debug errors
       });
@@ -1243,6 +1825,27 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         })
       });
       showToast(response.message);
+      loadStudentData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const handleQrCheckOut = async (qrToken) => {
+    if (!activeCheckin) return showToast('No active check-in found.', 'error');
+    setCheckingIn(true);
+    try {
+      const response = await apiFetch(`/api/sessions/${activeCheckin.session_id}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          method: 'qr',
+          qr_token: qrToken
+        })
+      });
+      showToast(response.message);
+      setCheckoutStatusDetails(response.record);
       loadStudentData();
     } catch (err) {
       showToast(err.message, 'error');
@@ -1276,6 +1879,38 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
     }
   };
 
+  const handleCodeCheckOut = async (e) => {
+    e.preventDefault();
+    if (!activeCheckin) return showToast('No active check-in found.', 'error');
+    setCheckingIn(true);
+    try {
+      const response = await apiFetch(`/api/sessions/${activeCheckin.session_id}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          method: 'code',
+          session_code: sessionCode
+        })
+      });
+      showToast(response.message);
+      setSessionCode('');
+      setCodeOpen(false);
+      setCheckoutStatusDetails(response.record);
+      loadStudentData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const submitCodeForm = (e) => {
+    if (isCheckoutAction) {
+      handleCodeCheckOut(e);
+    } else {
+      handleCodeCheckIn(e);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
       {/* Alert if any course falls below threshold */}
@@ -1289,37 +1924,90 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         </div>
       )}
 
-      {/* Main Check-in Hub */}
-      <div className="premium-card p-6 bg-gradient-to-br from-brand-600 to-indigo-800 text-white border-0 shadow-lg shadow-brand-500/20 flex flex-col items-center justify-center text-center">
-        <h3 className="text-xl font-bold">Class Check-in Panel</h3>
-        <p className="text-white/80 text-xs mt-1">Verify presence using QR code scanning or numeric check-in codes.</p>
-        
-        <div className="flex gap-4 w-full mt-6">
+      {/* Main Check-in / Check-out Hub */}
+      {!activeCheckin ? (
+        <div className="premium-card p-6 bg-gradient-to-br from-brand-600 to-indigo-800 text-white border-0 shadow-lg shadow-brand-500/20 flex flex-col items-center justify-center text-center">
+          <h3 className="text-xl font-bold">Class Check-in Panel</h3>
+          <p className="text-white/80 text-xs mt-1">Verify presence using QR code scanning or numeric check-in codes.</p>
+          
+          <div className="flex gap-4 w-full mt-6">
+            <button
+              onClick={() => startCameraScan(false)}
+              disabled={checkingIn}
+              className="flex-1 bg-white hover:bg-slate-100 text-brand-600 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+            >
+              <Camera className="w-4 h-4" />
+              Scan QR Code
+            </button>
+            <button
+              onClick={() => { setIsCheckoutAction(false); setCodeOpen(true); }}
+              disabled={checkingIn}
+              className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 border border-white/20 transition text-sm"
+            >
+              <Keyboard className="w-4 h-4" />
+              Enter Code
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="premium-card p-6 bg-gradient-to-br from-indigo-650 to-indigo-900 text-white border-0 shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] bg-white/20 text-white font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-2">Checked In</span>
+          <h3 className="text-xl font-bold">{activeCheckin.course_code} - {activeCheckin.course_name}</h3>
+          <p className="text-white/80 text-xs mt-1">Check-in recorded at {new Date(activeCheckin.timestamp).toLocaleTimeString()}</p>
+          
+          {activeCheckin.checkout_qr_token ? (
+            <div className="flex gap-4 w-full mt-6">
+              <button
+                onClick={() => startCameraScan(true)}
+                disabled={checkingIn}
+                className="flex-1 bg-white hover:bg-slate-105 text-indigo-850 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+              >
+                <Camera className="w-4 h-4" />
+                Scan Checkout QR
+              </button>
+              <button
+                onClick={() => { setIsCheckoutAction(true); setCodeOpen(true); }}
+                disabled={checkingIn}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 border border-white/20 transition text-sm"
+              >
+                <Keyboard className="w-4 h-4" />
+                Enter Checkout Code
+              </button>
+            </div>
+          ) : (
+            <div className="mt-6 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-xs w-full">
+              Waiting for the lecturer to open the check-out window...
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Checkout Success Result Modal */}
+      {checkoutStatusDetails && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 p-5 rounded-2xl flex flex-col items-center justify-center text-center text-sm">
+          <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-2 animate-bounce" />
+          <h4 className="font-bold text-emerald-800 dark:text-emerald-400">Successfully Checked Out</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Duration: <span className="font-bold text-slate-800 dark:text-slate-100">{checkoutStatusDetails.duration_minutes} minutes</span>
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Attendance Quality Status: <span className="font-bold capitalize text-emerald-600">{checkoutStatusDetails.attendance_status}</span>
+          </p>
           <button
-            onClick={startCameraScan}
-            disabled={checkingIn}
-            className="flex-1 bg-white hover:bg-slate-100 text-brand-600 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg"
+            onClick={() => setCheckoutStatusDetails(null)}
+            className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold"
           >
-            <Camera className="w-4 h-4" />
-            Scan QR Code
-          </button>
-          <button
-            onClick={() => setCodeOpen(true)}
-            disabled={checkingIn}
-            className="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 border border-white/20 transition"
-          >
-            <Keyboard className="w-4 h-4" />
-            Enter Code
+            Dismiss
           </button>
         </div>
-      </div>
+      )}
 
       {/* Camera QR scanner box overlay */}
       {scannerOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold">Scan Lecturer Screen QR</h3>
+              <h3 className="font-bold">{isCheckoutAction ? 'Scan Checkout QR' : 'Scan Check-in QR'}</h3>
               <button
                 onClick={() => {
                   if (scannerInstance.current) scannerInstance.current.clear();
@@ -1335,17 +2023,17 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         </div>
       )}
 
-      {/* Code check-in overlay */}
+      {/* Code check-in/out overlay */}
       {codeOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCodeCheckIn} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
-            <h3 className="font-bold text-lg mb-2">Enter Session Code</h3>
-            <p className="text-slate-500 text-xs mb-4">Provided by the lecturer at the beginning of the lecture.</p>
+          <form onSubmit={submitCodeForm} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-2">{isCheckoutAction ? 'Enter Checkout Code' : 'Enter Session Code'}</h3>
+            <p className="text-slate-500 text-xs mb-4">Provided by the lecturer at the check-out window.</p>
             <input
               type="text"
               required
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-center font-bold text-lg tracking-wider mb-4"
-              placeholder="e.g. ATT-1001"
+              placeholder={isCheckoutAction ? "e.g. OUT-1001" : "e.g. ATT-1001"}
               value={sessionCode}
               onChange={e => setSessionCode(e.target.value.toUpperCase())}
             />
@@ -1407,16 +2095,47 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
           {history.length === 0 ? (
             <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">No verification logs recorded yet.</div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {history.map((log, idx) => (
-                <div key={idx} className="p-4 flex justify-between items-center text-sm">
-                  <div>
-                    <p className="font-semibold">{log.course_name}</p>
-                    <p className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleString()} ({log.method} check-in)</p>
-                  </div>
-                  <span className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 px-2.5 py-1 rounded-lg">Verified</span>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-slate-500 text-xs font-bold uppercase">
+                    <th className="p-3">Course</th>
+                    <th className="p-3">Check-in</th>
+                    <th className="p-3">Check-out</th>
+                    <th className="p-3">Duration</th>
+                    <th className="p-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {history.map((log, idx) => {
+                    const checkinTime = new Date(log.timestamp).toLocaleString();
+                    const checkoutTime = log.checkout_timestamp ? new Date(log.checkout_timestamp).toLocaleTimeString() : 'N/A';
+                    const durationStr = log.duration_minutes !== null ? `${log.duration_minutes} mins` : '-';
+                    const statusStr = log.attendance_status || 'present';
+                    
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-sm">
+                        <td className="p-3">
+                          <p className="font-semibold">{log.course_name}</p>
+                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500">{log.course_code}</span>
+                        </td>
+                        <td className="p-3 text-xs text-slate-500">{checkinTime} ({log.method})</td>
+                        <td className="p-3 text-xs text-slate-500">{checkoutTime}</td>
+                        <td className="p-3 font-semibold">{durationStr}</td>
+                        <td className="p-3 text-right">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold uppercase ${
+                            statusStr === 'early_leaver' ? 'bg-orange-100 text-orange-700' :
+                            statusStr === 'late_checkout' ? 'bg-indigo-105 text-indigo-700' :
+                            'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {statusStr.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

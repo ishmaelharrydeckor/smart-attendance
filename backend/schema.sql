@@ -6,8 +6,19 @@ DROP TABLE IF EXISTS sessions CASCADE;
 DROP TABLE IF EXISTS course_enrollments CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS academic_periods CASCADE;
 
--- 1. Users Table
+-- 1. Academic Periods Table
+CREATE TABLE academic_periods (
+    id SERIAL PRIMARY KEY,
+    academic_year VARCHAR(20) NOT NULL,
+    semester INTEGER NOT NULL CHECK (semester IN (1, 2)),
+    is_current BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX only_one_current_semester ON academic_periods (is_current) WHERE is_current = true;
+
+-- 2. Users Table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -20,12 +31,13 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Courses Table
+-- 3. Courses Table
 CREATE TABLE courses (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     code VARCHAR(50) UNIQUE NOT NULL,
     lecturer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    academic_period_id INTEGER REFERENCES academic_periods(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -54,7 +66,14 @@ CREATE TABLE sessions (
     location_name VARCHAR(100),
     gps_lat DOUBLE PRECISION,
     gps_lng DOUBLE PRECISION,
-    allowed_radius_meters INTEGER DEFAULT 200
+    allowed_radius_meters INTEGER DEFAULT 200,
+    academic_period_id INTEGER REFERENCES academic_periods(id) ON DELETE SET NULL,
+    checkout_qr_token TEXT,
+    checkout_qr_expires_at TIMESTAMP WITH TIME ZONE,
+    checkout_session_code VARCHAR(20),
+    checkout_code_expires_at TIMESTAMP WITH TIME ZONE,
+    checkout_window_minutes INTEGER DEFAULT 10,
+    early_leaver_threshold_minutes INTEGER DEFAULT 15
 );
 
 -- 5. Attendance Records Table
@@ -68,6 +87,10 @@ CREATE TABLE attendance_records (
     gps_lng DOUBLE PRECISION,
     ip_address VARCHAR(45),
     is_present BOOLEAN DEFAULT TRUE,
+    checkout_timestamp TIMESTAMP WITH TIME ZONE,
+    checkout_method VARCHAR(20) CHECK (checkout_method IN ('qr', 'code', 'manual')),
+    duration_minutes INTEGER,
+    attendance_status VARCHAR(30) DEFAULT 'present' NOT NULL CHECK (attendance_status IN ('present', 'late_checkout', 'early_leaver', 'absent')),
     UNIQUE(session_id, student_id)
 );
 

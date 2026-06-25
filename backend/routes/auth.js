@@ -120,11 +120,31 @@ router.post('/login', async (req, res) => {
 
 // Get list of all available courses for student registration selection (Public)
 router.get('/courses', async (req, res) => {
+  const { academic_period_id } = req.query;
   try {
-    const result = await db.query('SELECT id, name, code FROM courses ORDER BY code ASC');
+    let result;
+    if (academic_period_id) {
+      result = await db.query(
+        'SELECT id, name, code, academic_period_id FROM courses WHERE academic_period_id = $1 ORDER BY code ASC',
+        [academic_period_id]
+      );
+    } else {
+      result = await db.query('SELECT id, name, code, academic_period_id FROM courses ORDER BY code ASC');
+    }
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching public courses:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all academic periods (Public)
+router.get('/academic-periods', async (req, res) => {
+  try {
+    const result = await db.query('SELECT id, academic_year, semester, is_current FROM academic_periods ORDER BY academic_year DESC, semester DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching academic periods:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

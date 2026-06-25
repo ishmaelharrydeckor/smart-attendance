@@ -59,7 +59,9 @@ router.get('/history', async (req, res) => {
     const result = await db.query(
       `SELECT 
          ar.timestamp, ar.method, ar.is_present,
-         s.date, s.start_time,
+         ar.checkout_timestamp, ar.duration_minutes, ar.attendance_status,
+         s.date, s.start_time, s.end_time, s.id as session_id,
+         s.checkout_qr_token, s.checkout_window_minutes,
          c.name as course_name, c.code as course_code
        FROM attendance_records ar
        JOIN sessions s ON ar.session_id = s.id
