@@ -1,0 +1,633 @@
+{
+  "academic_periods": [
+    {
+      "id": 1,
+      "academic_year": "2024/2025",
+      "semester": 1,
+      "is_current": false
+    },
+    {
+      "id": 2,
+      "academic_year": "2024/2025",
+      "semester": 2,
+      "is_current": true
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "name": "Dr. Sarah Jenkins",
+      "email": "lecturer@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "lecturer",
+      "student_id": null,
+      "level": null,
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:52.506Z"
+    },
+    {
+      "id": 2,
+      "name": "Student 1",
+      "email": "student1@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU001",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:54.196Z"
+    },
+    {
+      "id": 3,
+      "name": "Student 2",
+      "email": "student2@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU002",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:54.664Z"
+    },
+    {
+      "id": 4,
+      "name": "Student 3",
+      "email": "student3@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU003",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:55.093Z"
+    },
+    {
+      "id": 5,
+      "name": "Student 4",
+      "email": "student4@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU004",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:55.504Z"
+    },
+    {
+      "id": 6,
+      "name": "Student 5",
+      "email": "student5@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU005",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:55.921Z"
+    },
+    {
+      "id": 7,
+      "name": "Student 6",
+      "email": "student6@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU006",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:56.341Z"
+    },
+    {
+      "id": 8,
+      "name": "Student 7",
+      "email": "student7@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU007",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:56.751Z"
+    },
+    {
+      "id": 9,
+      "name": "Student 8",
+      "email": "student8@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU008",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:57.170Z"
+    },
+    {
+      "id": 10,
+      "name": "Student 9",
+      "email": "student9@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU009",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:57.578Z"
+    },
+    {
+      "id": 11,
+      "name": "Student 10",
+      "email": "student10@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU010",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:57.980Z"
+    },
+    {
+      "id": 12,
+      "name": "Student 11",
+      "email": "student11@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU011",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:58.387Z"
+    },
+    {
+      "id": 13,
+      "name": "Student 12",
+      "email": "student12@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU012",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:58.785Z"
+    },
+    {
+      "id": 14,
+      "name": "Student 13",
+      "email": "student13@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU013",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:59.185Z"
+    },
+    {
+      "id": 15,
+      "name": "Student 14",
+      "email": "student14@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU014",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:05:59.603Z"
+    },
+    {
+      "id": 16,
+      "name": "Student 15",
+      "email": "student15@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU015",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:00.002Z"
+    },
+    {
+      "id": 17,
+      "name": "Student 16",
+      "email": "student16@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU016",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:00.448Z"
+    },
+    {
+      "id": 18,
+      "name": "Student 17",
+      "email": "student17@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU017",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:00.900Z"
+    },
+    {
+      "id": 19,
+      "name": "Student 18",
+      "email": "student18@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU018",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:01.365Z"
+    },
+    {
+      "id": 20,
+      "name": "Student 19",
+      "email": "student19@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU019",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:01.779Z"
+    },
+    {
+      "id": 21,
+      "name": "Student 20",
+      "email": "student20@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU020",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:02.208Z"
+    },
+    {
+      "id": 22,
+      "name": "Student 21",
+      "email": "student21@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU021",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:02.617Z"
+    },
+    {
+      "id": 23,
+      "name": "Student 22",
+      "email": "student22@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU022",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:03.017Z"
+    },
+    {
+      "id": 24,
+      "name": "Student 23",
+      "email": "student23@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU023",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:03.418Z"
+    },
+    {
+      "id": 25,
+      "name": "Student 24",
+      "email": "student24@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU024",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:03.821Z"
+    },
+    {
+      "id": 26,
+      "name": "Student 25",
+      "email": "student25@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU025",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:04.229Z"
+    },
+    {
+      "id": 27,
+      "name": "Student 26",
+      "email": "student26@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU026",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:04.658Z"
+    },
+    {
+      "id": 28,
+      "name": "Student 27",
+      "email": "student27@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU027",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:05.087Z"
+    },
+    {
+      "id": 29,
+      "name": "Student 28",
+      "email": "student28@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU028",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:05.504Z"
+    },
+    {
+      "id": 30,
+      "name": "Student 29",
+      "email": "student29@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU029",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:05.956Z"
+    },
+    {
+      "id": 31,
+      "name": "Student 30",
+      "email": "student30@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU030",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:06.387Z"
+    },
+    {
+      "id": 32,
+      "name": "Student 31",
+      "email": "student31@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU031",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:06.846Z"
+    },
+    {
+      "id": 33,
+      "name": "Student 32",
+      "email": "student32@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU032",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:07.374Z"
+    },
+    {
+      "id": 34,
+      "name": "Student 33",
+      "email": "student33@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU033",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:07.792Z"
+    },
+    {
+      "id": 35,
+      "name": "Student 34",
+      "email": "student34@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU034",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:08.203Z"
+    },
+    {
+      "id": 36,
+      "name": "Student 35",
+      "email": "student35@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU035",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:08.638Z"
+    },
+    {
+      "id": 37,
+      "name": "Student 36",
+      "email": "student36@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU036",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:09.212Z"
+    },
+    {
+      "id": 38,
+      "name": "Student 37",
+      "email": "student37@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU037",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:09.668Z"
+    },
+    {
+      "id": 39,
+      "name": "Student 38",
+      "email": "student38@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU038",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:10.072Z"
+    },
+    {
+      "id": 40,
+      "name": "Student 39",
+      "email": "student39@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU039",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:10.481Z"
+    },
+    {
+      "id": 41,
+      "name": "Student 40",
+      "email": "student40@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU040",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:10.882Z"
+    },
+    {
+      "id": 42,
+      "name": "Student 41",
+      "email": "student41@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU041",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:11.282Z"
+    },
+    {
+      "id": 43,
+      "name": "Student 42",
+      "email": "student42@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU042",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:11.679Z"
+    },
+    {
+      "id": 44,
+      "name": "Student 43",
+      "email": "student43@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU043",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:12.093Z"
+    },
+    {
+      "id": 45,
+      "name": "Student 44",
+      "email": "student44@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU044",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:12.519Z"
+    },
+    {
+      "id": 46,
+      "name": "Student 45",
+      "email": "student45@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU045",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:12.953Z"
+    },
+    {
+      "id": 47,
+      "name": "Student 46",
+      "email": "student46@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU046",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:13.453Z"
+    },
+    {
+      "id": 48,
+      "name": "Student 47",
+      "email": "student47@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU047",
+      "level": "400",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:13.947Z"
+    },
+    {
+      "id": 49,
+      "name": "Student 48",
+      "email": "student48@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU048",
+      "level": "100",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:14.445Z"
+    },
+    {
+      "id": 50,
+      "name": "Student 49",
+      "email": "student49@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU049",
+      "level": "200",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:14.889Z"
+    },
+    {
+      "id": 51,
+      "name": "Student 50",
+      "email": "student50@university.edu",
+      "password_hash": "$2a$12$WAICzNeRQibp9KoT2iJ4PO8D2U96MR/q/B.RjIcnWiQaP6MzEjQS.",
+      "role": "student",
+      "student_id": "STU050",
+      "level": "300",
+      "profile_photo_url": null,
+      "created_at": "2026-06-25T17:06:15.382Z"
+    }
+  ],
+  "courses": [
+    {
+      "id": 4,
+      "name": "Information Technology",
+      "code": "PE-155",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:53.340Z"
+    },
+    {
+      "id": 5,
+      "name": "Thermodynamics I",
+      "code": "PE-257",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:53.483Z"
+    },
+    {
+      "id": 6,
+      "name": "Thermodynamics II",
+      "code": "PE-258",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:53.618Z"
+    },
+    {
+      "id": 7,
+      "name": "Computer Programming",
+      "code": "PE-262",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:53.757Z"
+    },
+    {
+      "id": 8,
+      "name": "Numerical Methods",
+      "code": "PE-350",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:53.897Z"
+    },
+    {
+      "id": 9,
+      "name": "Energy and Climate Change",
+      "code": "PE-476",
+      "lecturer_id": 1,
+      "academic_period_id": 2,
+      "created_at": "2026-06-25T17:05:54.049Z"
+    }
+  ],
+  "course_enrollments": [],
+  "sessions": [],
+  "attendance_records": [],
+  "attendance_audit_logs": []
+}

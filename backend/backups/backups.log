@@ -1,0 +1,9 @@
+[2026-06-25T17:59:00.882Z] Starting database backup...
+[2026-06-25T17:59:00.898Z] Backing up table: academic_periods
+[2026-06-25T17:59:01.693Z] Backing up table: users
+[2026-06-25T17:59:01.838Z] Backing up table: courses
+[2026-06-25T17:59:01.984Z] Backing up table: course_enrollments
+[2026-06-25T17:59:02.128Z] Backing up table: sessions
+[2026-06-25T17:59:02.279Z] Backing up table: attendance_records
+[2026-06-25T17:59:02.423Z] Backing up table: attendance_audit_logs
+[2026-06-25T17:59:02.567Z] Backup completed successfully. Saved to backup-2026-06-25T17-59-02-565Z.json (18.61 KB)

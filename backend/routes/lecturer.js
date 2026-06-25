@@ -635,4 +635,106 @@ router.get('/sessions/:sessionId/audit-logs', async (req, res) => {
   }
 });
 
+// Add a new Academic Period
+router.post('/academic-periods', async (req, res) => {
+  const { academic_year, semester, is_current } = req.body;
+  if (!academic_year || !semester) {
+    return res.status(400).json({ error: 'Academic year and semester are required.' });
+  }
+
+  try {
+    if (is_current) {
+      await db.query('UPDATE academic_periods SET is_current = false');
+    }
+
+    const result = await db.query(
+      'INSERT INTO academic_periods (academic_year, semester, is_current) VALUES ($1, $2, $3) RETURNING id, academic_year, semester, is_current',
+      [academic_year, parseInt(semester), !!is_current]
+    );
+
+    res.json({ success: true, academicPeriod: result.rows[0] });
+  } catch (error) {
+    console.error('Error adding academic period:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Set an Academic Period as Current
+router.put('/academic-periods/:id/set-current', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await db.query('UPDATE academic_periods SET is_current = false');
+    const result = await db.query(
+      'UPDATE academic_periods SET is_current = true WHERE id = $1 RETURNING id, academic_year, semester, is_current',
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Academic period not found.' });
+    }
+
+    res.json({ success: true, academicPeriod: result.rows[0] });
+  } catch (error) {
+    console.error('Error setting current academic period:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Edit an Academic Period
+router.put('/academic-periods/:id', async (req, res) => {
+  const { id } = req.params;
+  const { academic_year, semester } = req.body;
+
+  if (!academic_year || !semester) {
+    return res.status(400).json({ error: 'Academic year and semester are required.' });
+  }
+
+  try {
+    const result = await db.query(
+      'UPDATE academic_periods SET academic_year = $1, semester = $2 WHERE id = $3 RETURNING id, academic_year, semester, is_current',
+      [academic_year, parseInt(semester), id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Academic period not found.' });
+    }
+
+    res.json({ success: true, academicPeriod: result.rows[0] });
+  } catch (error) {
+    console.error('Error editing academic period:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete an Academic Period
+router.delete('/academic-periods/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const courseCheck = await db.query('SELECT id FROM courses WHERE academic_period_id = $1 LIMIT 1', [id]);
+    if (courseCheck.rowCount > 0) {
+      return res.status(400).json({ error: 'Cannot delete academic period. There are courses enrolled under this semester.' });
+    }
+
+    const result = await db.query('DELETE FROM academic_periods WHERE id = $1 RETURNING id, is_current', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Academic period not found.' });
+    }
+
+    const deletedPeriod = result.rows[0];
+    if (deletedPeriod.is_current) {
+      const fallback = await db.query('SELECT id FROM academic_periods ORDER BY academic_year DESC, semester DESC LIMIT 1');
+      if (fallback.rowCount > 0) {
+        await db.query('UPDATE academic_periods SET is_current = true WHERE id = $1', [fallback.rows[0].id]);
+      }
+    }
+
+    res.json({ success: true, message: 'Academic period deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting academic period:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

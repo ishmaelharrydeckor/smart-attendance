@@ -71,6 +71,68 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Fallback check-in states at App level
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [fallbackStudentId, setFallbackStudentId] = useState('');
+  const [fallbackSessionCode, setFallbackSessionCode] = useState('');
+  const [fallbackCheckingIn, setFallbackCheckingIn] = useState(false);
+
+  const getCoordinates = () => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        }),
+        () => resolve(null),
+        { 
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    });
+  };
+
+  const handleFallbackCheckIn = async (e) => {
+    if (e) e.preventDefault();
+    setFallbackCheckingIn(true);
+    const geo = await getCoordinates();
+    const payload = {
+      student_id: fallbackStudentId,
+      session_code: fallbackSessionCode,
+      lat: geo?.lat,
+      lng: geo?.lng,
+      accuracy: geo?.accuracy
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineRequest('/api/student/check-in/fallback', payload);
+      setFallbackOpen(false);
+      setFallbackStudentId('');
+      setFallbackSessionCode('');
+      setFallbackCheckingIn(false);
+      return;
+    }
+
+    try {
+      const response = await apiFetch('/api/student/check-in/fallback', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showToast(response.message || 'Check-in successful!');
+      setFallbackStudentId('');
+      setFallbackSessionCode('');
+      setFallbackOpen(false);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setFallbackCheckingIn(false);
+    }
+  };
+
   useEffect(() => {
     if (user && user.role === 'lecturer') {
       apiFetch('/api/auth/academic-periods')
@@ -190,6 +252,56 @@ export default function App() {
         </div>
       )}
 
+      {/* Global Fallback Student ID & Short Code Lookup Overlay */}
+      {fallbackOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleFallbackCheckIn} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-2">ID & Short Code Fallback</h3>
+            <p className="text-slate-500 text-xs mb-4">Enter your student ID and the session code shown on the screen to verify.</p>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Student ID</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. STU1001"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold dark:text-white"
+                  value={fallbackStudentId}
+                  onChange={e => setFallbackStudentId(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Session Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. ATT-1001"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold dark:text-white"
+                  value={fallbackSessionCode}
+                  onChange={e => setFallbackSessionCode(e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFallbackOpen(false)}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={fallbackCheckingIn}
+                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-50"
+              >
+                {fallbackCheckingIn ? 'Checking in...' : 'Submit'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Top Banner Navigation */}
       {user && (
         <nav className="sticky top-0 z-40 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-6 py-4 flex items-center justify-between">
@@ -239,7 +351,7 @@ export default function App() {
       )}
 
       {!user ? (
-        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} />
+        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} setFallbackOpen={setFallbackOpen} />
       ) : user.role === 'lecturer' ? (
         <LecturerConsole
           user={user}
@@ -251,6 +363,8 @@ export default function App() {
           apiFetch={apiFetch}
           academicPeriods={academicPeriods}
           selectedPeriodId={selectedPeriodId}
+          setAcademicPeriods={setAcademicPeriods}
+          setSelectedPeriodId={setSelectedPeriodId}
         />
       ) : (
         <StudentConsole
@@ -268,7 +382,7 @@ export default function App() {
 // -------------------------------------------------------------
 // AUTHENTICATION SCREEN (LOGIN & REGISTER)
 // -------------------------------------------------------------
-function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
+function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -516,6 +630,16 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
               Student checking in for the first time?{' '}
               <button type="button" onClick={() => setIsRegister(true)} className="text-brand-600 font-medium hover:underline">Register here</button>
             </p>
+
+            <div className="text-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setFallbackOpen(true)}
+                className="text-xs text-slate-500 hover:text-brand-600 underline font-medium transition"
+              >
+                Camera or scanner not working? Use Student ID & Code fallback
+              </button>
+            </div>
           </form>
         )}
       </div>
@@ -524,8 +648,14 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
 }
 
 // -------------------------------------------------------------
-function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch, academicPeriods, selectedPeriodId }) {
+function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch, academicPeriods, selectedPeriodId, setAcademicPeriods, setSelectedPeriodId }) {
   const [stats, setStats] = useState({ totalStudents: 0, totalSessions: 0, studentsBelowThreshold: 0, overallPercentage: 100, avgDuration: 0, earlyLeaversCount: 0 });
+  const [newYear, setNewYear] = useState('');
+  const [newSemester, setNewSemester] = useState('1');
+  const [newIsCurrent, setNewIsCurrent] = useState(false);
+  const [editingPeriodId, setEditingPeriodId] = useState(null);
+  const [editYear, setEditYear] = useState('');
+  const [editSemester, setEditSemester] = useState('1');
   const [courses, setCourses] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [flagged, setFlagged] = useState([]);
@@ -588,6 +718,94 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       if (qrPollInterval.current) clearInterval(qrPollInterval.current);
     };
   }, []);
+
+  const handleAddAcademicPeriod = async (e) => {
+    e.preventDefault();
+    if (!newYear) return showToast('Please enter an academic year.', 'error');
+    try {
+      const res = await apiFetch('/api/lecturer/academic-periods', {
+        method: 'POST',
+        body: JSON.stringify({
+          academic_year: newYear,
+          semester: parseInt(newSemester),
+          is_current: newIsCurrent
+        })
+      });
+      if (res.success) {
+        showToast('Academic period added successfully.');
+        const periods = await apiFetch('/api/auth/academic-periods');
+        setAcademicPeriods(periods);
+        if (newIsCurrent) {
+          setSelectedPeriodId(res.academicPeriod.id);
+        }
+        setNewYear('');
+        setNewSemester('1');
+        setNewIsCurrent(false);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleSetCurrentPeriod = async (id) => {
+    try {
+      const res = await apiFetch(`/api/lecturer/academic-periods/${id}/set-current`, {
+        method: 'PUT'
+      });
+      if (res.success) {
+        showToast('Active academic period updated.');
+        const periods = await apiFetch('/api/auth/academic-periods');
+        setAcademicPeriods(periods);
+        setSelectedPeriodId(id);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleEditAcademicPeriod = async (e) => {
+    e.preventDefault();
+    if (!editYear) return showToast('Please enter an academic year.', 'error');
+    try {
+      const res = await apiFetch(`/api/lecturer/academic-periods/${editingPeriodId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          academic_year: editYear,
+          semester: parseInt(editSemester)
+        })
+      });
+      if (res.success) {
+        showToast('Academic period updated successfully.');
+        const periods = await apiFetch('/api/auth/academic-periods');
+        setAcademicPeriods(periods);
+        setEditingPeriodId(null);
+        setEditYear('');
+        setEditSemester('1');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteAcademicPeriod = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this academic period?')) return;
+    try {
+      const res = await apiFetch(`/api/lecturer/academic-periods/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.success) {
+        showToast(res.message || 'Academic period deleted.');
+        const periods = await apiFetch('/api/auth/academic-periods');
+        setAcademicPeriods(periods);
+        if (selectedPeriodId === id) {
+          const current = periods.find(p => p.is_current) || periods[0];
+          if (current) setSelectedPeriodId(current.id);
+        }
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
 
   const loadStats = async (courseId) => {
     try {
@@ -1750,106 +1968,245 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
       {/* SETTINGS TAB */}
       {activeTab === 'settings' && (
-        <div className="max-w-xl premium-card p-8">
-          <h3 className="text-xl font-bold mb-2">System Attendance Rules</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Define automatic check-in criteria, threshold flags, and anti-fraud modules.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
+          <div className="premium-card p-8">
+            <h3 className="text-xl font-bold mb-2">System Attendance Rules</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Define automatic check-in criteria, threshold flags, and anti-fraud modules.</p>
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Minimum Attendance Threshold</label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="50"
-                  max="100"
-                  className="flex-1"
-                  value={settings.minThreshold}
-                  onChange={e => setSettings({ ...settings, minThreshold: parseInt(e.target.value) })}
-                />
-                <span className="font-bold text-lg">{settings.minThreshold}%</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Students falling below this threshold will be flagged in reports.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">QR Code Rotation Interval</label>
-              <select
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
-                value={settings.qrRotationMins}
-                onChange={e => setSettings({ ...settings, qrRotationMins: parseInt(e.target.value) })}
-              >
-                <option value="1">Every 1 minute</option>
-                <option value="2">Every 2 minutes</option>
-                <option value="5">Every 5 minutes</option>
-                <option value="10">Every 10 minutes</option>
-              </select>
-              <p className="text-xs text-slate-500 mt-1">Shorter duration helps avoid QR-code photo sharing fraud.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Early Leaver Threshold (Minutes)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
-                value={settings.earlyLeaverThreshold}
-                onChange={e => setSettings({ ...settings, earlyLeaverThreshold: parseInt(e.target.value) || 0 })}
-              />
-              <p className="text-xs text-slate-500 mt-1">Students checking out before this duration from session end will be flagged as early leavers.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Checkout Window Available Time (Minutes before session ends)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
-                value={settings.checkoutWindowMins}
-                onChange={e => setSettings({ ...settings, checkoutWindowMins: parseInt(e.target.value) || 0 })}
-              />
-              <p className="text-xs text-slate-500 mt-1">Allows student self check-out this many minutes before class scheduled end time.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Frequent Early Leaver Flag Threshold (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
-                value={settings.frequentEarlyLeaverThreshold}
-                onChange={e => setSettings({ ...settings, frequentEarlyLeaverThreshold: parseInt(e.target.value) || 0 })}
-              />
-              <p className="text-xs text-slate-500 mt-1">Flag students checked out early for more than this percentage of their attended classes.</p>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center">
-                <div>
-                  <label className="block text-sm font-semibold">GPS On-Campus Verification</label>
-                  <p className="text-xs text-slate-500">Enforce that student coordinates map within campus boundaries.</p>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Minimum Attendance Threshold</label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="50"
+                    max="100"
+                    className="flex-1"
+                    value={settings.minThreshold}
+                    onChange={e => setSettings({ ...settings, minThreshold: parseInt(e.target.value) })}
+                  />
+                  <span className="font-bold text-lg">{settings.minThreshold}%</span>
                 </div>
+                <p className="text-xs text-slate-500 mt-1">Students falling below this threshold will be flagged in reports.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">QR Code Rotation Interval</label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={settings.qrRotationMins}
+                  onChange={e => setSettings({ ...settings, qrRotationMins: parseInt(e.target.value) })}
+                >
+                  <option value="1">Every 1 minute</option>
+                  <option value="2">Every 2 minutes</option>
+                  <option value="5">Every 5 minutes</option>
+                  <option value="10">Every 10 minutes</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Shorter duration helps avoid QR-code photo sharing fraud.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Early Leaver Threshold (Minutes)</label>
                 <input
-                  type="checkbox"
-                  className="h-5 w-5 rounded text-brand-600"
-                  checked={settings.gpsEnabled}
-                  onChange={e => setSettings({ ...settings, gpsEnabled: e.target.checked })}
+                  type="number"
+                  min="0"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  value={settings.earlyLeaverThreshold}
+                  onChange={e => setSettings({ ...settings, earlyLeaverThreshold: parseInt(e.target.value) || 0 })}
                 />
+                <p className="text-xs text-slate-500 mt-1">Students checking out before this duration from session end will be flagged as early leavers.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Checkout Window Available Time (Minutes before session ends)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  value={settings.checkoutWindowMins}
+                  onChange={e => setSettings({ ...settings, checkoutWindowMins: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-slate-500 mt-1">Allows student self check-out this many minutes before class scheduled end time.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Frequent Early Leaver Flag Threshold (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  value={settings.frequentEarlyLeaverThreshold}
+                  onChange={e => setSettings({ ...settings, frequentEarlyLeaverThreshold: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-slate-500 mt-1">Flag students checked out early for more than this percentage of their attended classes.</p>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <label className="block text-sm font-semibold">GPS On-Campus Verification</label>
+                    <p className="text-xs text-slate-500">Enforce that student coordinates map within campus boundaries.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 rounded text-brand-600"
+                    checked={settings.gpsEnabled}
+                    onChange={e => setSettings({ ...settings, gpsEnabled: e.target.checked })}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => showToast('Settings applied successfully')}
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3.5 rounded-xl transition"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+
+          <div className="premium-card p-8 flex flex-col justify-between">
+            <div>
+              <h3 className="text-xl font-bold mb-2">Academic Semesters & Years</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Manage academic years and semesters. Set which academic period is active.</p>
+
+              {/* List of Periods */}
+              <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-1">
+                {academicPeriods.map(p => {
+                  const isEditing = editingPeriodId === p.id;
+                  
+                  if (isEditing) {
+                    return (
+                      <form key={p.id} onSubmit={handleEditAcademicPeriod} className="p-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-brand-500 space-y-3">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            required
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                            value={editYear}
+                            onChange={e => setEditYear(e.target.value)}
+                          />
+                          <select
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                            value={editSemester}
+                            onChange={e => setEditSemester(e.target.value)}
+                          >
+                            <option value="1">Sem 1</option>
+                            <option value="2">Sem 2</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditingPeriodId(null)}
+                            className="text-[10px] bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 px-2.5 py-1 rounded font-bold transition text-slate-800 dark:text-slate-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="text-[10px] bg-brand-600 hover:bg-brand-700 text-white px-2.5 py-1 rounded font-bold transition"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+
+                  return (
+                    <div key={p.id} className="flex justify-between items-center p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                      <div>
+                        <p className="font-bold text-sm">Semester {p.semester}</p>
+                        <p className="text-xs text-slate-500">{p.academic_year}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {p.is_current ? (
+                          <span className="bg-emerald-500 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">Active</span>
+                        ) : (
+                          <button
+                            onClick={() => handleSetCurrentPeriod(p.id)}
+                            className="bg-brand-600 hover:bg-brand-700 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider transition"
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { setEditingPeriodId(p.id); setEditYear(p.academic_year); setEditSemester(String(p.semester)); }}
+                          className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-750 rounded-xl transition text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAcademicPeriod(p.id)}
+                          className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition text-red-500 hover:text-red-755"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <button
-              onClick={() => showToast('Settings applied successfully')}
-              className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3.5 rounded-xl transition"
-            >
-              Save Configuration
-            </button>
+            {/* Add New Period Form */}
+            <form onSubmit={handleAddAcademicPeriod} className="border-t border-slate-200/80 dark:border-slate-800/80 pt-6 space-y-4">
+              <h4 className="font-bold text-sm">Create New Academic Period</h4>
+              
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Academic Year</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 2025/2026"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  value={newYear}
+                  onChange={e => setNewYear(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Semester</label>
+                  <select
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                    value={newSemester}
+                    onChange={e => setNewSemester(e.target.value)}
+                  >
+                    <option value="1">Semester 1</option>
+                    <option value="2">Semester 2</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      className="h-4.5 w-4.5 rounded text-brand-600"
+                      checked={newIsCurrent}
+                      onChange={e => setNewIsCurrent(e.target.checked)}
+                    />
+                    Set Active
+                  </label>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition text-sm"
+              >
+                Add Academic Period
+              </button>
+            </form>
           </div>
         </div>
       )}
-    </div>
-  );
-}
+
+
 
       {/* CSV Roster Preview Modal */}
       {csvPreviewOpen && (
@@ -2044,6 +2401,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
 // Subcomponent for reports
 function CourseReportCard({ course, apiFetch, showToast, settings }) {
   const [loading, setLoading] = useState(false);
@@ -2065,6 +2426,27 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
         showToast('No students enrolled in this course to print.', 'error');
         return;
       }
+
+      const studentCardsHtml = students.map(s => `
+        <div class="card">
+          <div class="name">${s.name}</div>
+          <div class="id">ID: ${s.student_id} | Level: ${s.level}</div>
+          <div id="qr-${s.student_id}" class="qr"></div>
+        </div>
+      `).join('');
+
+      const qrScripts = students.map(s => `
+        try {
+          var typeNumber = 4;
+          var errorCorrectionLevel = 'L';
+          var qr = qrcode(typeNumber, errorCorrectionLevel);
+          qr.addData("${s.student_id}");
+          qr.make();
+          document.getElementById("qr-${s.student_id}").innerHTML = qr.createImgTag(5);
+        } catch (e) {
+          console.error("Failed to generate QR for ${s.student_id}", e);
+        }
+      `).join('');
 
       const printWindow = window.open('', '_blank');
       printWindow.document.write(`
@@ -2088,28 +2470,11 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
             <h2>Personal QR Code Sheets - ${course.name} (${course.code})</h2>
             <button class="no-print" onclick="window.print()" style="padding: 10px 20px; margin-bottom: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #999;">Print Now</button>
             <div class="grid">
-              \${students.map(s => \`
-                <div class="card">
-                  <div class="name">\${s.name}</div>
-                  <div class="id">ID: \${s.student_id} | Level: \${s.level}</div>
-                  <div id="qr-\${s.student_id}" class="qr"></div>
-                </div>
-              \`).join('')}
+              ${studentCardsHtml}
             </div>
             <script>
               setTimeout(() => {
-                \${students.map(s => \`
-                  try {
-                    var typeNumber = 4;
-                    var errorCorrectionLevel = 'L';
-                    var qr = qrcode(typeNumber, errorCorrectionLevel);
-                    qr.addData("\${s.student_id}");
-                    qr.make();
-                    document.getElementById("qr-\${s.student_id}").innerHTML = qr.createImgTag(5);
-                  } catch (e) {
-                    console.error("Failed to generate QR for \${s.student_id}", e);
-                  }
-                \`).join('')}
+                ${qrScripts}
               }, 300);
             </script>
           </body>
@@ -2192,10 +2557,6 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
   const [sessionCode, setSessionCode] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
 
-  // Fallback Student ID & Short Code Lookup states
-  const [fallbackOpen, setFallbackOpen] = useState(false);
-  const [fallbackStudentId, setFallbackStudentId] = useState('');
-  const [fallbackSessionCode, setFallbackSessionCode] = useState('');
 
   // Checkout additions
   const [isCheckoutAction, setIsCheckoutAction] = useState(false);
@@ -2438,50 +2799,6 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
     }
   };
 
-  const handleFallbackCheckIn = async (e) => {
-    if (e) e.preventDefault();
-    setCheckingIn(true);
-    const geo = await getCoordinates();
-    const payload = {
-      student_id: fallbackStudentId,
-      session_code: fallbackSessionCode,
-      lat: geo?.lat,
-      lng: geo?.lng,
-      accuracy: geo?.accuracy
-    };
-
-    if (!navigator.onLine) {
-      queueOfflineRequest('/api/student/check-in/fallback', payload);
-      setFallbackOpen(false);
-      setFallbackStudentId('');
-      setFallbackSessionCode('');
-      setCheckingIn(false);
-      return;
-    }
-
-    try {
-      const response = await apiFetch('/api/student/check-in/fallback', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      showToast(response.message);
-      setFallbackStudentId('');
-      setFallbackSessionCode('');
-      setFallbackOpen(false);
-      loadStudentData();
-    } catch (err) {
-      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
-        queueOfflineRequest('/api/student/check-in/fallback', payload);
-        setFallbackOpen(false);
-        setFallbackStudentId('');
-        setFallbackSessionCode('');
-      } else {
-        showToast(err.message, 'error');
-      }
-    } finally {
-      setCheckingIn(false);
-    }
-  };
 
   const submitCodeForm = (e) => {
     if (isCheckoutAction) {
@@ -2529,12 +2846,6 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
             </button>
           </div>
 
-          <button
-            onClick={() => setFallbackOpen(true)}
-            className="text-xs text-white/60 hover:text-white underline mt-4 transition"
-          >
-            Camera or scanner not working? Use Student ID & Code fallback
-          </button>
         </div>
       ) : (
         <div className="premium-card p-6 bg-gradient-to-br from-indigo-650 to-indigo-900 text-white border-0 shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center text-center">
@@ -2644,55 +2955,7 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
         </div>
       )}
 
-      {/* Fallback Student ID & Short Code Lookup Overlay */}
-      {fallbackOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleFallbackCheckIn} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
-            <h3 className="font-bold text-lg mb-2">ID & Short Code Fallback</h3>
-            <p className="text-slate-500 text-xs mb-4">Enter your student ID and the session code shown on the screen to verify.</p>
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Student ID</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. STU1001"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold"
-                  value={fallbackStudentId}
-                  onChange={e => setFallbackStudentId(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Session Code</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. ATT-1001"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold"
-                  value={fallbackSessionCode}
-                  onChange={e => setFallbackSessionCode(e.target.value.toUpperCase())}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setFallbackOpen(false)}
-                className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={checkingIn}
-                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-sm font-semibold"
-              >
-                Verify
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+
 
       {/* Courses Progress list */}
       <div className="space-y-4">
