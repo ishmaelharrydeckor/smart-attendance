@@ -687,6 +687,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [selectedCourseForSession, setSelectedCourseForSession] = useState('');
   const [sessionDuration, setSessionDuration] = useState(10);
   const [lateGracePeriod, setLateGracePeriod] = useState(10);
+  const [sessionRadius, setSessionRadius] = useState(settings.gpsRadius || 200);
   const [capturingGps, setCapturingGps] = useState(false);
   const [csvEnrollList, setCsvEnrollList] = useState([]);
   const [enrollCourseId, setEnrollCourseId] = useState('');
