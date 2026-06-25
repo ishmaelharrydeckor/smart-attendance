@@ -121,6 +121,12 @@ router.post('/check-in/qr', checkInLimiter, async (req, res) => {
         return res.status(400).json({ error: 'GPS coordinates required for verification.' });
       }
 
+      // Check accuracy (prevent low-accuracy network fallback / mock location)
+      const reqAccuracy = req.body.accuracy ? parseFloat(req.body.accuracy) : null;
+      if (reqAccuracy && reqAccuracy > 150) {
+        return res.status(400).json({ error: 'GPS signal accuracy is too low. Please turn on your device GPS or move near a window.' });
+      }
+
       const distance = getDistanceInMeters(lat, lng, targetLat, targetLng);
       if (distance > allowedRadius) {
         return res.status(400).json({ error: 'Verification failed. You are outside the allowed class radius.' });
@@ -190,6 +196,12 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
 
       if (!lat || !lng) {
         return res.status(400).json({ error: 'GPS coordinates required for verification.' });
+      }
+
+      // Check accuracy
+      const reqAccuracy = req.body.accuracy ? parseFloat(req.body.accuracy) : null;
+      if (reqAccuracy && reqAccuracy > 150) {
+        return res.status(400).json({ error: 'GPS signal accuracy is too low. Please turn on your device GPS or move near a window.' });
       }
 
       const distance = getDistanceInMeters(lat, lng, targetLat, targetLng);

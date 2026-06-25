@@ -458,6 +458,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [selectedCourseForSession, setSelectedCourseForSession] = useState('');
   const [sessionDuration, setSessionDuration] = useState(10);
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
+  const [useLiveGps, setUseLiveGps] = useState(false);
+  const [capturingGps, setCapturingGps] = useState(false);
 
   // Active Live Session details
   const [activeSession, setActiveSession] = useState(null);
@@ -538,7 +540,38 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
   const startSession = async () => {
     if (!selectedCourseForSession) return showToast('Please select a course', 'error');
-    const room = LECTURE_ROOMS[selectedRoomIndex];
+    
+    let locationName = '';
+    let lat = null;
+    let lng = null;
+
+    if (useLiveGps) {
+      setCapturingGps(true);
+      showToast('Capturing live GPS location...', 'info');
+      try {
+        const coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            (err) => reject(new Error('GPS capture failed. Please check device permissions.')),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        });
+        lat = coords.lat;
+        lng = coords.lng;
+        locationName = 'Lecturer Live Location';
+      } catch (err) {
+        showToast(err.message, 'error');
+        setCapturingGps(false);
+        return;
+      }
+      setCapturingGps(false);
+    } else {
+      const room = LECTURE_ROOMS[selectedRoomIndex];
+      locationName = room?.name;
+      lat = room?.lat;
+      lng = room?.lng;
+    }
+
     try {
       const session = await apiFetch('/api/lecturer/sessions', {
         method: 'POST',
@@ -546,9 +579,9 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           course_id: selectedCourseForSession,
           duration_mins: sessionDuration,
           qr_rotation_mins: qrRotationTime,
-          location_name: room?.name,
-          gps_lat: room?.lat,
-          gps_lng: room?.lng
+          location_name: locationName,
+          gps_lat: lat,
+          gps_lng: lng
         })
       });
       setActiveSession(session);
@@ -724,15 +757,30 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <option key={c.id} value={c.id} className="text-slate-900">{c.code} - {c.name}</option>
                 ))}
               </select>
-              <select
-                className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white outline-none"
-                value={selectedRoomIndex}
-                onChange={e => setSelectedRoomIndex(parseInt(e.target.value))}
-              >
-                {LECTURE_ROOMS.map((room, idx) => (
-                  <option key={idx} value={idx} className="text-slate-900">{room.name}</option>
-                ))}
-              </select>
+
+              <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm select-none">
+                <input
+                  type="checkbox"
+                  id="useLiveGps"
+                  className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer"
+                  checked={useLiveGps}
+                  onChange={e => setUseLiveGps(e.target.checked)}
+                />
+                <label htmlFor="useLiveGps" className="cursor-pointer font-medium">Use my live GPS location</label>
+              </div>
+
+              {!useLiveGps && (
+                <select
+                  className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white outline-none"
+                  value={selectedRoomIndex}
+                  onChange={e => setSelectedRoomIndex(parseInt(e.target.value))}
+                >
+                  {LECTURE_ROOMS.map((room, idx) => (
+                    <option key={idx} value={idx} className="text-slate-900">{room.name}</option>
+                  ))}
+                </select>
+              )}
+
               <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
                 <Clock className="w-4 h-4 mr-2" />
                 <input
@@ -755,9 +803,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               </div>
               <button
                 onClick={startSession}
-                className="bg-white text-brand-600 font-bold px-6 py-3.5 rounded-xl hover:bg-slate-100 transition shadow-lg"
+                disabled={capturingGps}
+                className="bg-white text-brand-600 font-bold px-6 py-3.5 rounded-xl hover:bg-slate-100 transition shadow-lg disabled:opacity-50"
               >
-                Launch Session
+                {capturingGps ? 'Capturing GPS...' : 'Launch Session'}
               </button>
             </div>
           </div>
@@ -1127,9 +1176,17 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
     return new Promise((resolve) => {
       if (!navigator.geolocation) return resolve(null);
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => resolve({ 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        }),
         () => resolve(null),
-        { timeout: 5000 }
+        { 
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
       );
     });
   };
@@ -1183,7 +1240,8 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         body: JSON.stringify({
           qr_token: qrToken,
           lat: geo?.lat,
-          lng: geo?.lng
+          lng: geo?.lng,
+          accuracy: geo?.accuracy
         })
       });
       showToast(response.message);
@@ -1205,7 +1263,8 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
         body: JSON.stringify({
           session_code: sessionCode,
           lat: geo?.lat,
-          lng: geo?.lng
+          lng: geo?.lng,
+          accuracy: geo?.accuracy
         })
       });
       showToast(response.message);
