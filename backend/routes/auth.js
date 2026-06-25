@@ -166,10 +166,10 @@ router.post('/register/staff', async (req, res) => {
     return res.status(400).json({ error: 'All fields (name, email, password, invite_code) are required.' });
   }
 
-  // Validate email matches KNUST pattern
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+  // Validate email format
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(email)) {
-    return res.status(400).json({ error: 'Only KNUST staff/student email domains (@knust.edu.gh or @st.knust.edu.gh) are allowed.' });
+    return res.status(400).json({ error: 'Please provide a valid email address.' });
   }
 
   try {

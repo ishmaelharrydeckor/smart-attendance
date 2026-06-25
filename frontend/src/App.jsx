@@ -476,9 +476,9 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
     e.preventDefault();
     setLoading(true);
 
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@(st\.)?knust\.edu\.gh$/i;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      showToast('Only KNUST email domains (@knust.edu.gh or @st.knust.edu.gh) are allowed.', 'error');
+      showToast('Please enter a valid email address.', 'error');
       setLoading(false);
       return;
     }
