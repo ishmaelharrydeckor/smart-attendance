@@ -97,7 +97,11 @@ export default function App() {
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers
     };
-    const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+    // Combine base and endpoint, then sanitize double slashes (except after http:// or https://)
+    let url = `${API_BASE}${endpoint}`;
+    url = url.replace(/([^:]\/)\/+/g, "$1");
+    
+    const response = await fetch(url, { ...options, headers });
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.error || 'Server request failed');
