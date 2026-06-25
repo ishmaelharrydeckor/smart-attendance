@@ -248,6 +248,10 @@ router.post('/check-in/fallback', checkInLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Student ID and Session Code are required.' });
   }
 
+  if (student_id !== req.user.student_id) {
+    return res.status(403).json({ error: 'Access denied. You can only check in for your own student ID.' });
+  }
+
   try {
     const now = new Date();
     // 1. Find the student user record

@@ -71,12 +71,6 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Fallback check-in states at App level
-  const [fallbackOpen, setFallbackOpen] = useState(false);
-  const [fallbackStudentId, setFallbackStudentId] = useState('');
-  const [fallbackSessionCode, setFallbackSessionCode] = useState('');
-  const [fallbackCheckingIn, setFallbackCheckingIn] = useState(false);
-
   const getCoordinates = () => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) return resolve(null);
@@ -94,43 +88,6 @@ export default function App() {
         }
       );
     });
-  };
-
-  const handleFallbackCheckIn = async (e) => {
-    if (e) e.preventDefault();
-    setFallbackCheckingIn(true);
-    const geo = await getCoordinates();
-    const payload = {
-      student_id: fallbackStudentId,
-      session_code: fallbackSessionCode,
-      lat: geo?.lat,
-      lng: geo?.lng,
-      accuracy: geo?.accuracy
-    };
-
-    if (!navigator.onLine) {
-      queueOfflineRequest('/api/student/check-in/fallback', payload);
-      setFallbackOpen(false);
-      setFallbackStudentId('');
-      setFallbackSessionCode('');
-      setFallbackCheckingIn(false);
-      return;
-    }
-
-    try {
-      const response = await apiFetch('/api/student/check-in/fallback', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      showToast(response.message || 'Check-in successful!');
-      setFallbackStudentId('');
-      setFallbackSessionCode('');
-      setFallbackOpen(false);
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setFallbackCheckingIn(false);
-    }
   };
 
   useEffect(() => {
@@ -252,55 +209,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Global Fallback Student ID & Short Code Lookup Overlay */}
-      {fallbackOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleFallbackCheckIn} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
-            <h3 className="font-bold text-lg mb-2">ID & Short Code Fallback</h3>
-            <p className="text-slate-500 text-xs mb-4">Enter your student ID and the session code shown on the screen to verify.</p>
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Student ID</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. STU1001"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold dark:text-white"
-                  value={fallbackStudentId}
-                  onChange={e => setFallbackStudentId(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Session Code</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. ATT-1001"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-semibold dark:text-white"
-                  value={fallbackSessionCode}
-                  onChange={e => setFallbackSessionCode(e.target.value.toUpperCase())}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setFallbackOpen(false)}
-                className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={fallbackCheckingIn}
-                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-50"
-              >
-                {fallbackCheckingIn ? 'Checking in...' : 'Submit'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+
 
       {/* Top Banner Navigation */}
       {user && (
@@ -351,7 +260,7 @@ export default function App() {
       )}
 
       {!user ? (
-        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} setFallbackOpen={setFallbackOpen} />
+        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} />
       ) : (user.role === 'lecturer' || user.role === 'ta') ? (
         <LecturerConsole
           user={user}
@@ -382,7 +291,7 @@ export default function App() {
 // -------------------------------------------------------------
 // AUTHENTICATION SCREEN (LOGIN & REGISTER)
 // -------------------------------------------------------------
-function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
+function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
   const [isRegister, setIsRegister] = useState(false);
   const [isStaffRegister, setIsStaffRegister] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -758,15 +667,6 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setFallbackOpen }) {
               <button type="button" onClick={() => { setIsRegister(false); setIsStaffRegister(true); }} className="text-brand-600 font-medium hover:underline">Register with invite code</button>
             </p>
 
-            <div className="text-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setFallbackOpen(true)}
-                className="text-xs text-slate-500 hover:text-brand-600 underline font-medium transition"
-              >
-                Camera or scanner not working? Use Student ID & Code fallback
-              </button>
-            </div>
           </form>
         )}
       </div>
