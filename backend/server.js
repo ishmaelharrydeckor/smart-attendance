@@ -21,7 +21,7 @@ app.use(express.json());
 // Global Rate Limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per 15 minutes
+  max: 2000, // Increased limit to allow live dashboard polling
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 app.use('/api', globalLimiter);
