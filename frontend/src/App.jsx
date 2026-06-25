@@ -86,6 +86,8 @@ export default function App() {
     showToast('Logged out successfully', 'info');
   };
 
+  const API_BASE = import.meta.env.VITE_API_URL || '';
+
   // Helper fetch wrapper to include token headers
   const apiFetch = async (endpoint, options = {}) => {
     const headers = {
@@ -93,7 +95,7 @@ export default function App() {
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers
     };
-    const response = await fetch(endpoint, { ...options, headers });
+    const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.error || 'Server request failed');
@@ -193,7 +195,6 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
   useEffect(() => {
     if (isRegister) {
       // Fetch available courses so student can select them
-      fetch('/api/auth/login', { method: 'POST' }) // fallback fetch test or direct query
       apiFetch('/api/lecturer/courses')
         .then(setCourses)
         .catch(() => {
