@@ -29,7 +29,13 @@ const seed = async () => {
     const courses = [
       { name: 'Introduction to Computer Science', code: 'CS-101' },
       { name: 'Data Structures and Algorithms', code: 'CS-201' },
-      { name: 'Software Engineering Principles', code: 'CS-301' }
+      { name: 'Software Engineering Principles', code: 'CS-301' },
+      { name: 'Information Technology', code: 'PE-155' },
+      { name: 'Thermodynamics I', code: 'PE-257' },
+      { name: 'Thermodynamics II', code: 'PE-258' },
+      { name: 'Computer Programming', code: 'PE-262' },
+      { name: 'Numerical Methods', code: 'PE-350' },
+      { name: 'Energy and Climate Change', code: 'PE-476' }
     ];
 
     const courseIds = [];

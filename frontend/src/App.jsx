@@ -209,7 +209,13 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
           setCourses([
             { id: 1, name: 'Introduction to Computer Science', code: 'CS-101' },
             { id: 2, name: 'Data Structures and Algorithms', code: 'CS-201' },
-            { id: 3, name: 'Software Engineering Principles', code: 'CS-301' }
+            { id: 3, name: 'Software Engineering Principles', code: 'CS-301' },
+            { id: 4, name: 'Information Technology', code: 'PE-155' },
+            { id: 5, name: 'Thermodynamics I', code: 'PE-257' },
+            { id: 6, name: 'Thermodynamics II', code: 'PE-258' },
+            { id: 7, name: 'Computer Programming', code: 'PE-262' },
+            { id: 8, name: 'Numerical Methods', code: 'PE-350' },
+            { id: 9, name: 'Energy and Climate Change', code: 'PE-476' }
           ]);
         });
     }
@@ -529,6 +535,19 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     }
   };
 
+  const deleteCourse = async (courseId) => {
+    if (!window.confirm('Are you sure you want to delete this course? This will also delete all associated attendance logs and enrollments.')) return;
+    try {
+      await apiFetch(`/api/lecturer/courses/${courseId}`, {
+        method: 'DELETE'
+      });
+      showToast('Course deleted successfully');
+      loadCourses();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const startSession = async () => {
     if (!selectedCourseForSession) return showToast('Please select a course', 'error');
     
@@ -835,6 +854,13 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                       <h4 className="font-bold text-base mt-2.5 leading-tight">{course.name}</h4>
                       <p className="text-xs text-slate-500 mt-1">{course.enrolled_count || 0} students enrolled</p>
                     </div>
+                    <button
+                      onClick={() => deleteCourse(course.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-2 rounded-lg transition"
+                      title="Delete Course"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </div>
                 ))}
               </div>
