@@ -438,14 +438,6 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
 // -------------------------------------------------------------
 // LECTURER PORTAL CONSOLE
 // -------------------------------------------------------------
-const LECTURE_ROOMS = [
-  { name: 'Engineering Auditorium', lat: 6.67316, lng: -1.56540 },
-  { name: 'New Engineering Building (NEB)', lat: 6.67370, lng: -1.56480 },
-  { name: 'Old Engineering Block (OEB)', lat: 6.67280, lng: -1.56590 },
-  { name: 'Petroleum Building Lecture Theatre', lat: 6.67410, lng: -1.56420 },
-  { name: 'Chemical Engineering Building Hall', lat: 6.67220, lng: -1.56520 }
-];
-
 function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch }) {
   const [stats, setStats] = useState({ totalStudents: 0, presentToday: 0, absentToday: 0, overallPercentage: 100 });
   const [courses, setCourses] = useState([]);
@@ -457,8 +449,6 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [newCourseCode, setNewCourseCode] = useState('');
   const [selectedCourseForSession, setSelectedCourseForSession] = useState('');
   const [sessionDuration, setSessionDuration] = useState(10);
-  const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
-  const [useLiveGps, setUseLiveGps] = useState(false);
   const [capturingGps, setCapturingGps] = useState(false);
   const [sessionRadius, setSessionRadius] = useState(200);
 
@@ -542,36 +532,28 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const startSession = async () => {
     if (!selectedCourseForSession) return showToast('Please select a course', 'error');
     
-    let locationName = '';
+    let locationName = 'Lecturer Live Location';
     let lat = null;
     let lng = null;
 
-    if (useLiveGps) {
-      setCapturingGps(true);
-      showToast('Capturing live GPS location...', 'info');
-      try {
-        const coords = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            (err) => reject(new Error('GPS capture failed. Please check device permissions.')),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-        });
-        lat = coords.lat;
-        lng = coords.lng;
-        locationName = 'Lecturer Live Location';
-      } catch (err) {
-        showToast(err.message, 'error');
-        setCapturingGps(false);
-        return;
-      }
+    setCapturingGps(true);
+    showToast('Capturing live GPS location...', 'info');
+    try {
+      const coords = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          (err) => reject(new Error('GPS capture failed. Please check device permissions.')),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+      lat = coords.lat;
+      lng = coords.lng;
+    } catch (err) {
+      showToast(err.message, 'error');
       setCapturingGps(false);
-    } else {
-      const room = LECTURE_ROOMS[selectedRoomIndex];
-      locationName = room?.name;
-      lat = room?.lat;
-      lng = room?.lng;
+      return;
     }
+    setCapturingGps(false);
 
     try {
       const session = await apiFetch('/api/lecturer/sessions', {
@@ -759,29 +741,6 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <option key={c.id} value={c.id} className="text-slate-900">{c.code} - {c.name}</option>
                 ))}
               </select>
-
-              <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm select-none">
-                <input
-                  type="checkbox"
-                  id="useLiveGps"
-                  className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer"
-                  checked={useLiveGps}
-                  onChange={e => setUseLiveGps(e.target.checked)}
-                />
-                <label htmlFor="useLiveGps" className="cursor-pointer font-medium">Use my live GPS location</label>
-              </div>
-
-              {!useLiveGps && (
-                <select
-                  className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white outline-none"
-                  value={selectedRoomIndex}
-                  onChange={e => setSelectedRoomIndex(parseInt(e.target.value))}
-                >
-                  {LECTURE_ROOMS.map((room, idx) => (
-                    <option key={idx} value={idx} className="text-slate-900">{room.name}</option>
-                  ))}
-                </select>
-              )}
 
               <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
                 <Clock className="w-4 h-4 mr-2" />
