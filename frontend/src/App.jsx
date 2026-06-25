@@ -1127,12 +1127,24 @@ function StudentConsole({ user, settings, showToast, apiFetch }) {
       );
       scannerInstance.current.render(async (decodedText) => {
         // Stop scanning
-        scannerInstance.current.clear();
+        try {
+          scannerInstance.current.clear();
+        } catch (e) {
+          console.warn('Scanner clear error', e);
+        }
         setScannerOpen(false);
         
-        // Extract token
-        const url = new URL(decodedText);
-        const token = url.searchParams.get('qr');
+        // Extract token safely (handling full URLs or plain tokens)
+        let token = decodedText;
+        try {
+          if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
+            const url = new URL(decodedText);
+            token = url.searchParams.get('qr') || decodedText;
+          }
+        } catch (e) {
+          console.warn('URL parsing error, using raw decodedText', e);
+        }
+
         if (!token) return showToast('Invalid QR Code format scanned', 'error');
 
         // Send check-in request
