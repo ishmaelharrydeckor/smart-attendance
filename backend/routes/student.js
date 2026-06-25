@@ -115,7 +115,7 @@ router.post('/check-in/qr', checkInLimiter, async (req, res) => {
     if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
       const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
       const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
-      const allowedRadius = parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
+      const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
 
       if (!lat || !lng) {
         return res.status(400).json({ error: 'GPS coordinates required for verification.' });
@@ -192,7 +192,7 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
     if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
       const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
       const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
-      const allowedRadius = parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
+      const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
 
       if (!lat || !lng) {
         return res.status(400).json({ error: 'GPS coordinates required for verification.' });

@@ -135,7 +135,7 @@ router.delete('/courses/:id', async (req, res) => {
 
 // 4. Session Operations
 router.post('/sessions', async (req, res) => {
-  const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng } = req.body;
+  const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng, allowed_radius_meters } = req.body;
   if (!course_id) return res.status(400).json({ error: 'Course ID is required.' });
 
   try {
@@ -146,15 +146,16 @@ router.post('/sessions', async (req, res) => {
 
     const duration = duration_mins || 10;
     const rotation = qr_rotation_mins || 1;
+    const radius = allowed_radius_meters || 200;
 
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
     const qrExpiresAt = new Date(startTime.getTime() + rotation * 60 * 1000);
 
     const result = await db.query(
-      `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng)
-       VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null]
+      `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng, allowed_radius_meters)
+       VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null, radius]
     );
 
     res.status(201).json(result.rows[0]);

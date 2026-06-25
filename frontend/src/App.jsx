@@ -460,6 +460,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
   const [useLiveGps, setUseLiveGps] = useState(false);
   const [capturingGps, setCapturingGps] = useState(false);
+  const [sessionRadius, setSessionRadius] = useState(200);
 
   // Active Live Session details
   const [activeSession, setActiveSession] = useState(null);
@@ -581,7 +582,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           qr_rotation_mins: qrRotationTime,
           location_name: locationName,
           gps_lat: lat,
-          gps_lng: lng
+          gps_lng: lng,
+          allowed_radius_meters: sessionRadius
         })
       });
       setActiveSession(session);
@@ -799,6 +801,16 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   className="bg-transparent text-white focus:outline-none w-full"
                   value={qrRotationTime}
                   onChange={e => setQrRotationTime(parseInt(e.target.value) || 1)}
+                />
+              </div>
+              <div className="flex items-center bg-white/10 border border-white/20 rounded-xl px-4 py-3">
+                <MapPin className="w-4 h-4 mr-2" />
+                <input
+                  type="number"
+                  placeholder="Geofence Radius (meters)"
+                  className="bg-transparent text-white focus:outline-none w-full"
+                  value={sessionRadius}
+                  onChange={e => setSessionRadius(parseInt(e.target.value) || 200)}
                 />
               </div>
               <button
