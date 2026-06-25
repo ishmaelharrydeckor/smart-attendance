@@ -132,7 +132,7 @@ export default function App() {
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none tracking-tight">Antigravity Roll</h1>
+              <h1 className="font-bold text-lg leading-none tracking-tight">SmartRoll</h1>
               <span className="text-xs text-slate-500 dark:text-slate-400">Smart Attendance System</span>
             </div>
           </div>
