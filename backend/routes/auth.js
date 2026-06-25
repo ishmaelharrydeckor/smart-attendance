@@ -118,4 +118,15 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Get list of all available courses for student registration selection (Public)
+router.get('/courses', async (req, res) => {
+  try {
+    const result = await db.query('SELECT id, name, code FROM courses ORDER BY code ASC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching public courses:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

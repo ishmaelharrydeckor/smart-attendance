@@ -202,7 +202,7 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
   useEffect(() => {
     if (isRegister) {
       // Fetch available courses so student can select them
-      apiFetch('/api/lecturer/courses')
+      apiFetch('/api/auth/courses')
         .then(setCourses)
         .catch(() => {
           // If auth isn't active yet, use mock fallback list
