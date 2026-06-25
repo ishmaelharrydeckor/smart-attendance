@@ -53,7 +53,8 @@ CREATE TABLE sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     location_name VARCHAR(100),
     gps_lat DOUBLE PRECISION,
-    gps_lng DOUBLE PRECISION
+    gps_lng DOUBLE PRECISION,
+    allowed_radius_meters INTEGER DEFAULT 200
 );
 
 -- 5. Attendance Records Table
