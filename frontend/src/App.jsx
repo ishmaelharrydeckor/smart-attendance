@@ -3141,8 +3141,8 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
       {/* Main Check-in / Check-out Hub */}
       {!activeCheckin ? (
         <div className="premium-card p-6 bg-gradient-to-br from-brand-600 to-indigo-800 text-white border-0 shadow-lg shadow-brand-500/20 flex flex-col items-center justify-center text-center">
-          <h3 className="text-xl font-bold">Class Check-in Panel</h3>
-          <p className="text-white/80 text-xs mt-1">Verify presence using QR code scanning or numeric check-in codes.</p>
+          <h3 className="text-xl font-bold">Class Attendance Panel</h3>
+          <p className="text-white/80 text-xs mt-1">Verify attendance by checking in or checking out using QR codes or numeric codes.</p>
           
           <div className="flex gap-4 w-full mt-6">
             <button
