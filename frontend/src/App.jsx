@@ -1388,49 +1388,82 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Go to the "Manage Courses" tab to create courses for the selected semester.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {courses.map(course => {
-                  const levelMatch = course.code.match(/\d/);
-                  const calculatedLevel = levelMatch ? levelMatch[0] + '00' : 'Undergrad';
-                  
-                  return (
-                    <div key={course.id} className="premium-card p-6 flex flex-col justify-between hover:shadow-xl hover:border-brand-500/30 transition-all duration-300 group">
-                      <div>
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 px-3 py-1 rounded-lg">
-                            {course.code}
-                          </span>
-                          <span className="text-xs font-medium text-slate-400">
-                            {calculatedLevel} Level
-                          </span>
-                        </div>
-                        <h3 className="font-bold text-lg leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                          {course.name}
-                        </h3>
-                      </div>
-                      
-                      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
-                        <div>
-                          <p className="text-slate-400 text-xs">Enrolled</p>
-                          <p className="font-bold text-slate-700 dark:text-slate-300">{course.enrolled_count || 0} Students</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-slate-400 text-xs">Attendance</p>
-                          <p className={`font-bold ${
-                            course.overall_attendance_rate < settings.minThreshold ? 'text-red-500' : 'text-emerald-500'
-                          }`}>{course.overall_attendance_rate}%</p>
-                        </div>
-                      </div>
+              <div className="space-y-8">
+                {(() => {
+                  const renderCourseGrid = (courseList) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {courseList.map(course => {
+                        const levelMatch = course.code.match(/\d/);
+                        const calculatedLevel = levelMatch ? levelMatch[0] + '00' : 'Undergrad';
+                        
+                        return (
+                          <div key={course.id} className="premium-card p-6 flex flex-col justify-between hover:shadow-xl hover:border-brand-500/30 transition-all duration-300 group">
+                            <div>
+                              <div className="flex justify-between items-start mb-4">
+                                <span className="text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 px-3 py-1 rounded-lg">
+                                  {course.code}
+                                </span>
+                                <span className="text-xs font-medium text-slate-400">
+                                  {calculatedLevel} Level
+                                </span>
+                              </div>
+                              <h3 className="font-bold text-lg leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                                {course.name}
+                              </h3>
+                            </div>
+                            
+                            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
+                              <div>
+                                <p className="text-slate-400 text-xs">Enrolled</p>
+                                <p className="font-bold text-slate-700 dark:text-slate-300">{course.enrolled_count || 0} Students</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-slate-400 text-xs">Attendance</p>
+                                <p className={`font-bold ${
+                                  course.overall_attendance_rate < settings.minThreshold ? 'text-red-500' : 'text-emerald-500'
+                                }`}>{course.overall_attendance_rate}%</p>
+                              </div>
+                            </div>
 
-                      <button
-                        onClick={() => setSelectedCourseId(course.id)}
-                        className="w-full mt-5 bg-slate-105 dark:bg-slate-800 hover:bg-brand-600 hover:text-white dark:hover:bg-brand-600 font-semibold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-1"
-                      >
-                        View Dashboard <ChevronRight className="w-4 h-4" />
-                      </button>
+                            <button
+                              onClick={() => setSelectedCourseId(course.id)}
+                              className="w-full mt-5 bg-slate-105 dark:bg-slate-800 hover:bg-brand-600 hover:text-white dark:hover:bg-brand-600 font-semibold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-1"
+                            >
+                              View Dashboard <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
-                })}
+
+                  const firstSemList = courses.filter(c => {
+                    const match = c.code.trim().match(/(\d+)$/);
+                    return match ? parseInt(match[1]) % 2 !== 0 : true;
+                  });
+
+                  const secondSemList = courses.filter(c => {
+                    const match = c.code.trim().match(/(\d+)$/);
+                    return match ? parseInt(match[1]) % 2 === 0 : false;
+                  });
+
+                  return (
+                    <>
+                      {firstSemList.length > 0 && (
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 border-b pb-2">First Semester Courses</h3>
+                          {renderCourseGrid(firstSemList)}
+                        </div>
+                      )}
+                      {secondSemList.length > 0 && (
+                        <div className="space-y-4 pt-4">
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 border-b pb-2">Second Semester Courses</h3>
+                          {renderCourseGrid(secondSemList)}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
