@@ -803,6 +803,17 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     }
   };
 
+  const handleRevokeTA = async (id) => {
+    if (!confirm('Are you sure you want to end all course access for this TA? They will no longer be able to manage attendance sessions.')) return;
+    try {
+      await apiFetch(`/api/lecturer/invite-codes/${id}/revoke`, { method: 'POST' });
+      showToast('TA access revoked successfully.');
+      loadInviteCodes();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const handleAddAcademicPeriod = async (e) => {
     e.preventDefault();
     if (!newYear) return showToast('Please enter an academic year.', 'error');
@@ -2464,9 +2475,25 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                         </div>
                         <div className="flex items-center gap-2">
                           {code.used ? (
-                            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider" title={`Used by ${code.used_by_name || 'ID ' + code.used_by}`}>
-                              Used
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {code.intended_role === 'ta' && (
+                                code.active_assignment_count > 0 ? (
+                                  <button
+                                    onClick={() => handleRevokeTA(code.id)}
+                                    className="px-2.5 py-1 text-[10px] border border-red-200 dark:border-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition font-semibold"
+                                  >
+                                    Revoke Access
+                                  </button>
+                                ) : (
+                                  <span className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                                    Access Revoked
+                                  </span>
+                                )
+                              )}
+                              <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider" title={`Used by ${code.used_by_name || 'ID ' + code.used_by}`}>
+                                Used
+                              </span>
+                            </div>
                           ) : isExpired ? (
                             <span className="bg-slate-200 text-slate-600 dark:bg-slate-700/60 dark:text-slate-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
                               Expired

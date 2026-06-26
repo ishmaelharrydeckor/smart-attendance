@@ -800,7 +800,18 @@ router.post('/invite-codes/generate', requireRole('lecturer'), async (req, res) 
 router.get('/invite-codes', requireRole('lecturer'), async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT ic.*, u.name as used_by_name 
+      `SELECT ic.*, u.name as used_by_name,
+        (SELECT COUNT(*)::integer FROM course_ta_assignments 
+         WHERE ta_user_id = ic.used_by 
+         AND course_id IN (
+           SELECT jsonb_array_elements_text(
+             CASE 
+               WHEN jsonb_typeof(ic.course_ids) = 'array' THEN ic.course_ids 
+               ELSE '[]'::jsonb 
+             END
+           )::integer
+         )
+        ) as active_assignment_count
        FROM invite_codes ic
        LEFT JOIN users u ON ic.used_by = u.id
        WHERE ic.created_by = $1
@@ -810,6 +821,43 @@ router.get('/invite-codes', requireRole('lecturer'), async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching invite codes:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/invite-codes/:id/revoke', requireRole('lecturer'), async (req, res) => {
+  try {
+    const inviteRes = await db.query(
+      'SELECT * FROM invite_codes WHERE id = $1 AND created_by = $2',
+      [req.params.id, req.user.id]
+    );
+
+    if (inviteRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Invite code not found or unauthorized.' });
+    }
+
+    const invite = inviteRes.rows[0];
+    if (!invite.used || !invite.used_by) {
+      return res.status(400).json({ error: 'This invite code has not been redeemed yet.' });
+    }
+
+    let courseIds = [];
+    if (typeof invite.course_ids === 'string') {
+      courseIds = JSON.parse(invite.course_ids);
+    } else if (Array.isArray(invite.course_ids)) {
+      courseIds = invite.course_ids;
+    }
+
+    if (courseIds.length > 0) {
+      await db.query(
+        'DELETE FROM course_ta_assignments WHERE ta_user_id = $1 AND course_id = ANY($2)',
+        [invite.used_by, courseIds]
+      );
+    }
+
+    res.json({ message: 'TA access revoked successfully.' });
+  } catch (err) {
+    console.error('Error revoking TA access:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
