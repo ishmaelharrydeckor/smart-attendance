@@ -168,6 +168,23 @@ router.post('/courses', requireRole('lecturer'), async (req, res) => {
   if (!name || !code || !academic_period_id) return res.status(400).json({ error: 'Course name, code, and academic period are required.' });
 
   try {
+    const periodRes = await db.query('SELECT semester FROM academic_periods WHERE id = $1', [academic_period_id]);
+    if (periodRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid academic period.' });
+    }
+    const semester = periodRes.rows[0].semester;
+    const match = code.trim().match(/(\d+)$/);
+    if (match) {
+      const lastNumber = parseInt(match[1]);
+      const isOdd = lastNumber % 2 !== 0;
+      if (isOdd && semester !== 1) {
+        return res.status(400).json({ error: 'Course codes ending in odd numbers are for first semesters.' });
+      }
+      if (!isOdd && semester !== 2) {
+        return res.status(400).json({ error: 'Course codes ending in even numbers are for second semesters.' });
+      }
+    }
+
     const result = await db.query(
       'INSERT INTO courses (name, code, lecturer_id, academic_period_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [name, code, req.user.id, academic_period_id]
@@ -179,9 +196,31 @@ router.post('/courses', requireRole('lecturer'), async (req, res) => {
   }
 });
 
+
 router.put('/courses/:id', requireRole('lecturer'), async (req, res) => {
   const { name, code } = req.body;
   try {
+    if (code) {
+      const courseCheck = await db.query(
+        'SELECT c.academic_period_id, ap.semester FROM courses c JOIN academic_periods ap ON c.academic_period_id = ap.id WHERE c.id = $1 AND c.lecturer_id = $2',
+        [req.params.id, req.user.id]
+      );
+      if (courseCheck.rows.length === 0) return res.status(404).json({ error: 'Course not found or unauthorized.' });
+      
+      const semester = courseCheck.rows[0].semester;
+      const match = code.trim().match(/(\d+)$/);
+      if (match) {
+        const lastNumber = parseInt(match[1]);
+        const isOdd = lastNumber % 2 !== 0;
+        if (isOdd && semester !== 1) {
+          return res.status(400).json({ error: 'Course codes ending in odd numbers are for first semesters.' });
+        }
+        if (!isOdd && semester !== 2) {
+          return res.status(400).json({ error: 'Course codes ending in even numbers are for second semesters.' });
+        }
+      }
+    }
+
     const result = await db.query(
       'UPDATE courses SET name = $1, code = $2 WHERE id = $3 AND lecturer_id = $4 RETURNING *',
       [name, code, req.params.id, req.user.id]

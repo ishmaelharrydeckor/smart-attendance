@@ -39,9 +39,10 @@ router.get('/courses', async (req, res) => {
          COUNT(DISTINCT s.id) as total_sessions
        FROM course_enrollments ce
        JOIN courses c ON ce.course_id = c.id
+       JOIN academic_periods ap ON c.academic_period_id = ap.id
        LEFT JOIN sessions s ON s.course_id = c.id
        LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.student_id = ce.student_id
-       WHERE ce.student_id = $1
+       WHERE ce.student_id = $1 AND ap.is_current = true
        GROUP BY c.id, c.name, c.code`,
       [req.user.id]
     );
