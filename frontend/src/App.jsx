@@ -1772,7 +1772,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                 {sessions.map(s => (
                   <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-sm">
                     <td className="p-4">{new Date(s.date).toLocaleDateString()}</td>
-                    <td className="p-4 font-semibold">{s.course_code}</td>
+                    <td className="p-4">
+                      <p className="font-semibold">{s.course_code}</p>
+                      <p className="text-[10px] text-slate-500">By: {s.creator_name || 'System'}</p>
+                    </td>
                     <td className="p-4"><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{s.session_code}</code></td>
                     <td className="p-4">
                       <div className="text-xs">

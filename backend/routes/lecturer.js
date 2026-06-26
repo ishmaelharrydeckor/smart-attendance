@@ -249,7 +249,7 @@ router.get('/sessions', requireLecturerOrTA, async (req, res) => {
   const { academic_period_id, course_id } = req.query;
   try {
     let query = `
-      SELECT s.*, c.name as course_name, c.code as course_code,
+      SELECT s.*, c.name as course_name, c.code as course_code, u.name as creator_name,
       (SELECT COUNT(*) FROM attendance_records WHERE session_id = s.id AND is_present = true) as present_count,
       (SELECT COUNT(*) FROM attendance_records WHERE session_id = s.id AND is_present = true AND checkout_timestamp IS NOT NULL) as checked_out_count,
       (SELECT COUNT(*) FROM attendance_records WHERE session_id = s.id AND is_present = true AND checkout_timestamp IS NULL) as not_checked_out_count,
@@ -257,6 +257,7 @@ router.get('/sessions', requireLecturerOrTA, async (req, res) => {
       (SELECT COUNT(*) FROM attendance_records WHERE session_id = s.id AND attendance_status = 'early_leaver') as early_leavers_count
       FROM sessions s
       JOIN courses c ON s.course_id = c.id
+      LEFT JOIN users u ON s.created_by = u.id
     `;
     let params = [];
     if (req.user.role === 'ta') {
