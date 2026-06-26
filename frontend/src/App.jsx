@@ -1784,9 +1784,35 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                     <td className="p-4 font-medium">{s.avg_duration_minutes || 0} mins</td>
                     <td className="p-4 text-orange-550 font-bold">{s.early_leavers_count || 0}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${s.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
-                        {s.is_active ? 'Active' : 'Closed'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${s.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}`}>
+                          {s.is_active ? 'Active' : 'Closed'}
+                        </span>
+                        {s.is_active && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Are you sure you want to end this active session early?')) return;
+                              try {
+                                await apiFetch(`/api/lecturer/sessions/${s.id}/toggle`, {
+                                  method: 'PUT',
+                                  body: JSON.stringify({ is_active: false })
+                                });
+                                showToast('Session ended');
+                                if (activeSession && activeSession.id === s.id) {
+                                  clearInterval(qrPollInterval.current);
+                                  setActiveSession(null);
+                                }
+                                loadSessions();
+                              } catch (err) {
+                                showToast(err.message, 'error');
+                              }
+                            }}
+                            className="text-xs bg-red-100 hover:bg-red-200 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-650 px-2.5 py-1 rounded-xl font-semibold transition"
+                          >
+                            End
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2427,6 +2453,11 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                           <p className="text-[10px] text-slate-400 mt-1">
                             Expires: {new Date(code.expires_at).toLocaleString()}
                           </p>
+                          {code.used && (
+                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
+                              Redeemed by: {code.used_by_name || 'User ID ' + code.used_by}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {code.used ? (
