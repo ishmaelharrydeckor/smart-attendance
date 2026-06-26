@@ -26,6 +26,19 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    const coursesRes = await db.query(
+      'SELECT id, code FROM courses WHERE id = ANY($1)',
+      [course_ids]
+    );
+
+    for (const course of coursesRes.rows) {
+      const match = course.code.match(/\d/);
+      const courseLevel = match ? match[0] + '00' : '100';
+      if (courseLevel !== level.toString()) {
+        return res.status(400).json({ error: `Course ${course.code} is for Level ${courseLevel} but you are Level ${level}.` });
+      }
+    }
+
     // Check if email or student ID exists
     const checkUser = await db.query(
       'SELECT id FROM users WHERE email = $1 OR student_id = $2',

@@ -582,7 +582,10 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
                 <select
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
                   value={level}
-                  onChange={e => setLevel(e.target.value)}
+                  onChange={e => {
+                    setLevel(e.target.value);
+                    setSelectedCourses([]);
+                  }}
                 >
                   <option value="100">100</option>
                   <option value="200">200</option>
@@ -626,25 +629,37 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Select Enrolled Courses</label>
               <div className="space-y-2 max-h-32 overflow-y-auto border border-slate-100 dark:border-slate-800 p-3 rounded-xl">
-                {courses.map(course => (
-                  <div
-                    key={course.id}
-                    onClick={() => toggleCourseSelect(course.id)}
-                    className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer border transition ${
-                      selectedCourses.includes(course.id)
-                        ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/20'
-                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <p className="font-semibold text-sm">{course.name}</p>
-                      <p className="text-xs text-slate-500">{course.code}</p>
+                {(() => {
+                  const filtered = courses.filter(course => {
+                    const match = course.code.match(/\d/);
+                    const courseLevel = match ? match[0] + '00' : '100';
+                    return courseLevel === level;
+                  });
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-xs text-slate-400 text-center py-4 font-medium">No courses available for Level {level}</p>
+                    );
+                  }
+                  return filtered.map(course => (
+                    <div
+                      key={course.id}
+                      onClick={() => toggleCourseSelect(course.id)}
+                      className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer border transition ${
+                        selectedCourses.includes(course.id)
+                          ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/20'
+                          : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-semibold text-sm">{course.name}</p>
+                        <p className="text-xs text-slate-500">{course.code}</p>
+                      </div>
+                      {selectedCourses.includes(course.id) && (
+                        <Check className="w-4 h-4 text-brand-600" />
+                      )}
                     </div>
-                    {selectedCourses.includes(course.id) && (
-                      <Check className="w-4 h-4 text-brand-600" />
-                    )}
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             </div>
 
