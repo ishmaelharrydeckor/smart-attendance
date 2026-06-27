@@ -3226,6 +3226,7 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
           <body>
             <h2>Personal QR Code Sheets - ${course.name} (${course.code})</h2>
             <button class="no-print" onclick="window.print()" style="padding: 10px 20px; margin-bottom: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #999;">Print Now</button>
+            <button class="no-print" id="email-btn" onclick="emailQRCodes()" style="padding: 10px 20px; margin-bottom: 20px; margin-left: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #4f46e5; background-color: #4f46e5; color: white;">Email QR Codes to Students</button>
             <div class="grid">
               ${studentCardsHtml}
             </div>
@@ -3233,6 +3234,28 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
               setTimeout(() => {
                 ${qrScripts}
               }, 300);
+
+              async function emailQRCodes() {
+                const btn = document.getElementById('email-btn');
+                btn.disabled = true;
+                btn.innerText = 'Sending Emails...';
+                try {
+                  const res = await fetch('${window.location.origin}/api/lecturer/courses/${course.id}/email-qrs', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': 'Bearer ${localStorage.getItem('token')}'
+                    }
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Failed to email QRs');
+                  alert(data.message || 'QR codes emailed successfully!');
+                } catch (err) {
+                  alert(err.message);
+                } finally {
+                  btn.disabled = false;
+                  btn.innerText = 'Email QR Codes to Students';
+                }
+              }
             </script>
           </body>
         </html>
