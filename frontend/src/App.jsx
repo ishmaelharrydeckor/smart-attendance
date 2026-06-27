@@ -854,6 +854,14 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLogsOpen, setAuditLogsOpen] = useState(false);
 
+  // Course Edit and Limits states
+  const [newCourseTotalSessions, setNewCourseTotalSessions] = useState('');
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [editCourseCode, setEditCourseCode] = useState('');
+  const [editCourseName, setEditCourseName] = useState('');
+  const [editCourseTotalSessions, setEditCourseTotalSessions] = useState('');
+
+
   // Active Live Session details
   const [activeSession, setActiveSession] = useState(null);
   const [liveAttendanceList, setLiveAttendanceList] = useState([]);
@@ -1141,16 +1149,47 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         body: JSON.stringify({ 
           name: newCourseName, 
           code: newCourseCode, 
-          academic_period_id: periodId 
+          academic_period_id: periodId,
+          total_sessions: newCourseTotalSessions !== '' ? parseInt(newCourseTotalSessions) : null
         })
       });
       showToast('Course created successfully');
       setNewCourseName('');
       setNewCourseCode('');
+      setNewCourseTotalSessions('');
       loadCourses();
     } catch (err) {
       showToast(err.message, 'error');
     }
+  };
+
+  const handleEditCourse = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch(`/api/lecturer/courses/${editingCourse.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editCourseName,
+          code: editCourseCode,
+          total_sessions: editCourseTotalSessions !== '' ? parseInt(editCourseTotalSessions) : null
+        })
+      });
+      showToast('Course updated successfully');
+      setEditingCourse(null);
+      setEditCourseName('');
+      setEditCourseCode('');
+      setEditCourseTotalSessions('');
+      loadCourses();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const startEditCourse = (course) => {
+    setEditingCourse(course);
+    setEditCourseCode(course.code);
+    setEditCourseName(course.name);
+    setEditCourseTotalSessions(course.total_sessions || '');
   };
 
   const deleteCourse = async (courseId) => {
@@ -1888,6 +1927,17 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <option value="2" className="text-slate-900">Semester 2</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Total Semester Sessions (Optional)</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 15"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={newCourseTotalSessions}
+                  onChange={e => setNewCourseTotalSessions(e.target.value)}
+                />
+              </div>
               <button type="submit" className="w-full bg-brand-600 text-white font-semibold py-3 rounded-xl hover:bg-brand-700 transition">
                 Create Course
               </button>
@@ -1917,13 +1967,22 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                         Import Roster (CSV)
                       </button>
                     </div>
-                    <button
-                      onClick={() => deleteCourse(course.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-2 rounded-lg transition"
-                      title="Delete Course"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEditCourse(course)}
+                        className="text-slate-500 hover:text-brand-650 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg transition"
+                        title="Edit Course"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteCourse(course.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-2 rounded-lg transition"
+                        title="Delete Course"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2754,6 +2813,68 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Edit Course Modal */}
+      {editingCourse && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <form onSubmit={handleEditCourse} className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-2">Edit Course</h3>
+            <p className="text-slate-500 text-xs mb-4">Modify course details and expected semester sessions.</p>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Course Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. CS-301"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={editCourseCode}
+                  onChange={e => setEditCourseCode(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Course Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Software Engineering Principles"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={editCourseName}
+                  onChange={e => setEditCourseName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Total Semester Sessions (Optional)</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 15"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={editCourseTotalSessions}
+                  onChange={e => setEditCourseTotalSessions(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingCourse(null)}
+                className="flex-1 bg-slate-105 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 py-3 rounded-xl text-sm font-semibold transition animate-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl text-sm font-semibold transition animate-all"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

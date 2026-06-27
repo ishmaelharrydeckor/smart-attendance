@@ -36,14 +36,14 @@ router.get('/courses', async (req, res) => {
       `SELECT 
          c.id, c.name, c.code,
          COUNT(CASE WHEN ar.is_present = true THEN 1 END) as attended,
-         COUNT(DISTINCT s.id) as total_sessions
+         COALESCE(c.total_sessions, COUNT(DISTINCT s.id))::integer as total_sessions
        FROM course_enrollments ce
        JOIN courses c ON ce.course_id = c.id
        JOIN academic_periods ap ON c.academic_period_id = ap.id
        LEFT JOIN sessions s ON s.course_id = c.id
        LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.student_id = ce.student_id
        WHERE ce.student_id = $1 AND ap.is_current = true
-       GROUP BY c.id, c.name, c.code`,
+       GROUP BY c.id, c.name, c.code, c.total_sessions`,
       [req.user.id]
     );
 

@@ -164,7 +164,7 @@ router.get('/courses', requireLecturerOrTA, async (req, res) => {
 });
 
 router.post('/courses', requireRole('lecturer'), async (req, res) => {
-  const { name, code, academic_period_id } = req.body;
+  const { name, code, academic_period_id, total_sessions } = req.body;
   if (!name || !code || !academic_period_id) return res.status(400).json({ error: 'Course name, code, and academic period are required.' });
 
   try {
@@ -186,8 +186,8 @@ router.post('/courses', requireRole('lecturer'), async (req, res) => {
     }
 
     const result = await db.query(
-      'INSERT INTO courses (name, code, lecturer_id, academic_period_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, code, req.user.id, academic_period_id]
+      'INSERT INTO courses (name, code, lecturer_id, academic_period_id, total_sessions) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, code, req.user.id, academic_period_id, total_sessions !== undefined && total_sessions !== '' ? parseInt(total_sessions) : null]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -198,7 +198,7 @@ router.post('/courses', requireRole('lecturer'), async (req, res) => {
 
 
 router.put('/courses/:id', requireRole('lecturer'), async (req, res) => {
-  const { name, code } = req.body;
+  const { name, code, total_sessions } = req.body;
   try {
     if (code) {
       const courseCheck = await db.query(
@@ -222,8 +222,8 @@ router.put('/courses/:id', requireRole('lecturer'), async (req, res) => {
     }
 
     const result = await db.query(
-      'UPDATE courses SET name = $1, code = $2 WHERE id = $3 AND lecturer_id = $4 RETURNING *',
-      [name, code, req.params.id, req.user.id]
+      'UPDATE courses SET name = $1, code = $2, total_sessions = $3 WHERE id = $4 AND lecturer_id = $5 RETURNING *',
+      [name, code, total_sessions !== undefined && total_sessions !== '' ? parseInt(total_sessions) : null, req.params.id, req.user.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found or unauthorized.' });
     res.json(result.rows[0]);
