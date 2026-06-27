@@ -874,6 +874,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
   const qrPollInterval = useRef(null);
 
+  // Lecturer QR Card Scanner states
+  const [lecturerScannerOpen, setLecturerScannerOpen] = useState(false);
+  const lecturerScannerRef = useRef(null);
+  const lecturerScannerInstance = useRef(null);
+
+
   useEffect(() => {
     if (selectedPeriodId) {
       loadCourses();
@@ -1204,6 +1210,57 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       showToast(err.message, 'error');
     }
   };
+
+  const handleLecturerScan = async (decodedStudentId) => {
+    if (!decodedStudentId) return;
+    try {
+      await apiFetch(`/api/lecturer/sessions/${activeSession.id}/override`, {
+        method: 'POST',
+        body: JSON.stringify({
+          student_id: decodedStudentId,
+          is_present: true,
+          attendance_status: 'present',
+          reason: 'Scanned Student QR Card'
+        })
+      });
+      showToast(`Student ${decodedStudentId} checked in successfully!`);
+      const updatedList = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
+      setLiveAttendanceList(updatedList);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (lecturerScannerOpen) {
+      const startScanner = async () => {
+        await new Promise(r => setTimeout(r, 150));
+        if (!lecturerScannerRef.current) return;
+        lecturerScannerInstance.current = new Html5QrcodeScanner(
+          "lecturer-qr-reader-container",
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          false
+        );
+        lecturerScannerInstance.current.render(async (decodedText) => {
+          if (lecturerScannerInstance.current) {
+            lecturerScannerInstance.current.clear();
+          }
+          setLecturerScannerOpen(false);
+          await handleLecturerScan(decodedText.trim());
+        }, (error) => {
+          // Silence noise
+        });
+      };
+      startScanner();
+    }
+    return () => {
+      if (lecturerScannerInstance.current) {
+        try {
+          lecturerScannerInstance.current.clear();
+        } catch(e) {}
+      }
+    };
+  }, [lecturerScannerOpen]);
 
   const handleCsvImportFile = (e) => {
     const file = e.target.files[0];
@@ -2153,30 +2210,39 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               )
             )}
 
-            <div className="flex gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
-              <label className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-3.5 rounded-xl transition cursor-pointer text-center text-sm">
-                <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-                Upload CSV Checkin
-              </label>
+            <div className="flex flex-col gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
               <button
-                onClick={async () => {
-                  try {
-                    await apiFetch(`/api/lecturer/sessions/${activeSession.id}/toggle`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ is_active: false })
-                    });
-                    clearInterval(qrPollInterval.current);
-                    setActiveSession(null);
-                    showToast('Session ended');
-                    setActiveTab('sessions');
-                  } catch (e) {
-                    showToast(e.message, 'error');
-                  }
-                }}
-                className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 rounded-xl text-sm"
+                onClick={() => setLecturerScannerOpen(true)}
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md"
               >
-                Close Session
+                <Camera className="w-4 h-4" />
+                Scan Student Cards
               </button>
+              <div className="flex gap-2">
+                <label className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-3.5 rounded-xl transition cursor-pointer text-center text-sm">
+                  <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+                  Upload CSV Checkin
+                </label>
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiFetch(`/api/lecturer/sessions/${activeSession.id}/toggle`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ is_active: false })
+                      });
+                      clearInterval(qrPollInterval.current);
+                      setActiveSession(null);
+                      showToast('Session ended');
+                      setActiveTab('sessions');
+                    } catch (e) {
+                      showToast(e.message, 'error');
+                    }
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 rounded-xl text-sm"
+                >
+                  Close Session
+                </button>
+              </div>
             </div>
           </div>
 
@@ -3528,6 +3594,27 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
               </button>
             </div>
             <div id="qr-reader-container" ref={scannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Lecturer Camera QR scanner for student cards */}
+      {lecturerScannerOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold">Scan Student Card</h3>
+              <button
+                onClick={() => {
+                  if (lecturerScannerInstance.current) lecturerScannerInstance.current.clear();
+                  setLecturerScannerOpen(false);
+                }}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <div id="lecturer-qr-reader-container" ref={lecturerScannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
           </div>
         </div>
       )}
