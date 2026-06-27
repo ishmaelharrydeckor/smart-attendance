@@ -3194,12 +3194,12 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
 
       const qrScripts = students.map(s => `
         try {
-          var typeNumber = 4;
+          var typeNumber = 0;
           var errorCorrectionLevel = 'L';
           var qr = qrcode(typeNumber, errorCorrectionLevel);
           qr.addData("${s.student_id}");
           qr.make();
-          document.getElementById("qr-${s.student_id}").innerHTML = qr.createImgTag(5);
+          document.getElementById("qr-${s.student_id}").innerHTML = qr.createImgTag(4);
         } catch (e) {
           console.error("Failed to generate QR for ${s.student_id}", e);
         }

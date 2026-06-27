@@ -666,15 +666,19 @@ router.post('/sessions/:sessionId/override', requireLecturerOrTA, requireCourseA
 
   try {
     // 1. Get student user db id
-    const studentUserRes = await db.query('SELECT id FROM users WHERE id = $1', [student_id]);
+    const studentUserRes = await db.query(
+      "SELECT id FROM users WHERE id::text = $1 OR student_id = $1 OR index_number = $1",
+      [student_id]
+    );
     if (studentUserRes.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found.' });
     }
+    const resolvedStudentId = studentUserRes.rows[0].id;
 
     // 2. Fetch existing attendance record
     const existingRes = await db.query(
       'SELECT * FROM attendance_records WHERE session_id = $1 AND student_id = $2',
-      [sessionId, student_id]
+      [sessionId, resolvedStudentId]
     );
 
     const oldStatus = existingRes.rows.length > 0 
@@ -689,7 +693,7 @@ router.post('/sessions/:sessionId/override', requireLecturerOrTA, requireCourseA
         `INSERT INTO attendance_records (session_id, student_id, method, is_present, attendance_status)
          VALUES ($1, $2, 'manual', $3, $4)
          RETURNING id`,
-        [sessionId, student_id, is_present, newStatus]
+        [sessionId, resolvedStudentId, is_present, newStatus]
       );
       recordId = insertRes.rows[0].id;
     } else {
