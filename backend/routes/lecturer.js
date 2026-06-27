@@ -499,9 +499,9 @@ router.get('/courses/:id/report', requireRole('lecturer'), requireCourseAccess, 
          (SELECT COUNT(CASE WHEN attendance_status = 'early_leaver' THEN 1 END) FROM attendance_records WHERE student_id = u.id AND session_id IN (SELECT id FROM sessions WHERE course_id = $1)) as early_leaver_sessions
        FROM course_enrollments ce
        JOIN users u ON ce.student_id = u.id
-       CROSS JOIN sessions s
+       LEFT JOIN sessions s ON s.course_id = ce.course_id
        LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.student_id = u.id
-       WHERE ce.course_id = $1 AND s.course_id = $1
+       WHERE ce.course_id = $1
        ORDER BY u.name ASC, s.date DESC`,
       [req.params.id]
     );
