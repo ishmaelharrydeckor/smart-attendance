@@ -3235,36 +3235,16 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
                 ${qrScripts}
               }, 300);
 
-              async function downloadZip() {
+              function downloadZip() {
                 const btn = document.getElementById('download-zip-btn');
                 btn.disabled = true;
-                btn.innerText = 'Generating ZIP...';
-                try {
-                  const res = await fetch('${window.location.origin}/api/lecturer/courses/${course.id}/download-qrs-zip', {
-                    method: 'GET',
-                    headers: {
-                      'Authorization': 'Bearer ${localStorage.getItem('token')}'
-                    }
-                  });
-                  if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || 'Failed to download ZIP');
-                  }
-                  const blob = await res.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'qrcodes-${course.code.trim().replace(/[^a-zA-Z0-9]/g, '_')}.zip';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  window.URL.revokeObjectURL(url);
-                } catch (err) {
-                  alert(err.message);
-                } finally {
+                btn.innerText = 'Downloading...';
+                const token = encodeURIComponent(localStorage.getItem('token') || '');
+                window.location.href = '${window.location.origin}/api/lecturer/courses/${course.id}/download-qrs-zip?token=' + token;
+                setTimeout(() => {
                   btn.disabled = false;
                   btn.innerText = 'Download all QR Codes (ZIP)';
-                }
+                }, 3000);
               }
             </script>
           </body>
