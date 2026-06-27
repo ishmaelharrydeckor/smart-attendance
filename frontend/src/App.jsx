@@ -879,6 +879,13 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const lecturerScannerRef = useRef(null);
   const lecturerScannerInstance = useRef(null);
 
+  // Metrics card student lists states
+  const [enrolledStudents, setEnrolledStudents] = useState([]);
+  const [earlyLeaverStudents, setEarlyLeaverStudents] = useState([]);
+  const [activeMetricModal, setActiveMetricModal] = useState(null); // 'enrolled' | 'flagged' | 'early_leavers' | null
+  const [metricModalSearch, setMetricModalSearch] = useState('');
+
+
 
   useEffect(() => {
     if (selectedPeriodId) {
@@ -1080,12 +1087,17 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         }
       });
       const students = Object.values(studentMap);
+      setEnrolledStudents(students);
+
       const flaggedList = students.filter(s => {
         const attRate = s.total > 0 ? (s.attended / s.total) * 100 : 100;
         const earlyRate = s.attended > 0 ? (s.early_leavers / s.attended) * 100 : 0;
         return attRate < settings.minThreshold || earlyRate > settings.frequentEarlyLeaverThreshold;
       });
       setFlaggedStudents(flaggedList);
+
+      const earlyLeaverList = students.filter(s => s.early_leavers > 0);
+      setEarlyLeaverStudents(earlyLeaverList);
     } catch (e) {
       console.warn(e.message);
     }
@@ -1673,7 +1685,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
             {/* Course-scoped stats cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-              <div className="premium-card p-6 flex items-center justify-between">
+              <div 
+                onClick={() => { setActiveMetricModal('enrolled'); setMetricModalSearch(''); }}
+                className="premium-card p-6 flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition active:scale-[0.98]"
+              >
                 <div>
                   <p className="text-sm font-semibold text-slate-500">Total Enrolled</p>
                   <h3 className="text-3xl font-bold mt-1">{stats.totalStudents}</h3>
@@ -1682,7 +1697,10 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <Users className="w-6 h-6" />
                 </div>
               </div>
-              <div className="premium-card p-6 flex items-center justify-between">
+              <div 
+                onClick={() => { setActiveMetricModal('flagged'); setMetricModalSearch(''); }}
+                className="premium-card p-6 flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition active:scale-[0.98]"
+              >
                 <div>
                   <p className="text-sm font-semibold text-slate-500">Below Flag</p>
                   <h3 className="text-3xl font-bold mt-1 text-red-550">{stats.studentsBelowThreshold}</h3>
@@ -1693,7 +1711,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               </div>
               <div className="premium-card p-6 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-slate-500">Total Sessions</p>
+                  <p className="text-sm font-semibold text-slate-500 font-medium">Total Sessions</p>
                   <h3 className="text-3xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">{stats.totalSessions}</h3>
                 </div>
                 <div className="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-2xl text-indigo-650 dark:text-indigo-400">
@@ -1718,9 +1736,12 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <Clock className="w-6 h-6" />
                 </div>
               </div>
-              <div className="premium-card p-6 flex items-center justify-between">
+              <div 
+                onClick={() => { setActiveMetricModal('early_leavers'); setMetricModalSearch(''); }}
+                className="premium-card p-6 flex items-center justify-between cursor-pointer hover:scale-[1.02] hover:shadow-md transition active:scale-[0.98]"
+              >
                 <div>
-                  <p className="text-sm font-semibold text-slate-500 font-medium">Early Leavers</p>
+                  <p className="text-sm font-semibold text-slate-550 font-medium">Early Leavers</p>
                   <h3 className="text-3xl font-bold mt-1 text-orange-550">{stats.earlyLeaversCount || 0}</h3>
                 </div>
                 <div className="bg-orange-50 dark:bg-orange-950/40 p-4 rounded-2xl text-orange-650 dark:text-orange-400">
@@ -3615,6 +3636,111 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
               </button>
             </div>
             <div id="lecturer-qr-reader-container" ref={lecturerScannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Metric Students Detail Modal */}
+      {activeMetricModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="font-bold text-lg">
+                  {activeMetricModal === 'enrolled' && 'Enrolled Students'}
+                  {activeMetricModal === 'flagged' && 'Flagged Students (Below Threshold)'}
+                  {activeMetricModal === 'early_leavers' && 'Early Leavers'}
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  {activeMetricModal === 'enrolled' && `List of all ${enrolledStudents.length} students enrolled in this course.`}
+                  {activeMetricModal === 'flagged' && `Students below the ${settings.minThreshold}% attendance or high early checkout threshold.`}
+                  {activeMetricModal === 'early_leavers' && `Students who checked out early in one or more sessions.`}
+                </p>
+              </div>
+              <button
+                onClick={() => { setActiveMetricModal(null); setMetricModalSearch(''); }}
+                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-305 p-2 rounded-lg transition"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Search filter input */}
+            <div className="relative mb-4">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search by student name, ID..."
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium"
+                value={metricModalSearch}
+                onChange={e => setMetricModalSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Students Table */}
+            <div className="flex-1 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 font-bold border-b border-slate-100 dark:border-slate-800 text-slate-500 uppercase">
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Student / Ref ID</th>
+                    <th className="p-3">Level</th>
+                    <th className="p-3 text-center">Attended</th>
+                    {activeMetricModal === 'early_leavers' ? (
+                      <th className="p-3 text-center">Early Leaves</th>
+                    ) : (
+                      <th className="p-3 text-center">Attendance %</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(() => {
+                    const list = 
+                      activeMetricModal === 'enrolled' ? enrolledStudents :
+                      activeMetricModal === 'flagged' ? flaggedStudents :
+                      earlyLeaverStudents;
+
+                    const filtered = list.filter(s => 
+                      s.name.toLowerCase().includes(metricModalSearch.toLowerCase()) ||
+                      s.academic_student_id.toLowerCase().includes(metricModalSearch.toLowerCase())
+                    );
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-slate-400">
+                            No matching student records found.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map(s => {
+                      const attRate = s.total > 0 ? Math.round((s.attended / s.total) * 100) : 100;
+                      return (
+                        <tr key={s.academic_student_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-xs">
+                          <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{s.name}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-400">{s.academic_student_id}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-400">{s.level}</td>
+                          <td className="p-3 text-center text-slate-700 dark:text-slate-300 font-medium">{s.attended} / {s.total}</td>
+                          {activeMetricModal === 'early_leavers' ? (
+                            <td className="p-3 text-center text-orange-550 font-bold">{s.early_leavers}</td>
+                          ) : (
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded font-bold ${
+                                attRate < settings.minThreshold ? 'bg-red-50 text-red-650' : 'bg-emerald-50 text-emerald-700'
+                              }`}>
+                                {attRate}%
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
