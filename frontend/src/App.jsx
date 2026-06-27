@@ -1243,36 +1243,30 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     }
   };
 
-  useEffect(() => {
-    if (lecturerScannerOpen) {
-      const startScanner = async () => {
-        await new Promise(r => setTimeout(r, 150));
-        if (!lecturerScannerRef.current) return;
-        lecturerScannerInstance.current = new Html5QrcodeScanner(
-          "lecturer-qr-reader-container",
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          false
-        );
-        lecturerScannerInstance.current.render(async (decodedText) => {
+  const startLecturerCameraScan = () => {
+    setLecturerScannerOpen(true);
+    setTimeout(() => {
+      if (!lecturerScannerRef.current) return;
+      lecturerScannerInstance.current = new Html5QrcodeScanner(
+        "lecturer-qr-reader-container",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        false
+      );
+      lecturerScannerInstance.current.render(async (decodedText) => {
+        try {
           if (lecturerScannerInstance.current) {
             lecturerScannerInstance.current.clear();
           }
-          setLecturerScannerOpen(false);
-          await handleLecturerScan(decodedText.trim());
-        }, (error) => {
-          // Silence noise
-        });
-      };
-      startScanner();
-    }
-    return () => {
-      if (lecturerScannerInstance.current) {
-        try {
-          lecturerScannerInstance.current.clear();
-        } catch(e) {}
-      }
-    };
-  }, [lecturerScannerOpen]);
+        } catch (e) {
+          console.warn('Scanner clear error', e);
+        }
+        setLecturerScannerOpen(false);
+        await handleLecturerScan(decodedText.trim());
+      }, (error) => {
+        // Silence noise
+      });
+    }, 250);
+  };
 
   const handleCsvImportFile = (e) => {
     const file = e.target.files[0];
@@ -2187,7 +2181,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
             <div className="flex flex-col gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
               <button
-                onClick={() => setLecturerScannerOpen(true)}
+                onClick={startLecturerCameraScan}
                 className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md"
               >
                 <Camera className="w-4 h-4" />
