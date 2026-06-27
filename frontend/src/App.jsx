@@ -1235,14 +1235,14 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       const validated = parsed.map(item => {
         return {
           name: item.Name || item.name || '',
-          student_id: item['Student ID'] || item.student_id || '',
+          student_id: item['Student ID'] || item['Index Number'] || item['Reference Number'] || item['Ref Number'] || item.student_id || item.index_number || item.reference_number || item.ref_number || '',
           level: item.Level || item.level || '',
           email: item.Email || item.email || ''
         };
       }).filter(s => s.name && s.student_id && s.level && s.email);
 
       if (validated.length === 0) {
-        showToast('No valid student records found. Check headers: Name, Student ID, Level, Email', 'error');
+        showToast('No valid student records found. Check headers: Name, Student ID (or Index/Ref Number), Level, Email', 'error');
         return;
       }
 
@@ -2759,7 +2759,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
             <h3 className="text-lg font-bold mb-2">Import Student Roster</h3>
-            <p className="text-xs text-slate-500 mb-4 font-medium">Upload a CSV file containing students' Name, Student ID, Level, and Email.</p>
+            <p className="text-xs text-slate-500 mb-4 font-medium">Upload a CSV file containing students' Name, Student ID (or Index/Reference Number), Level, and Email.</p>
             
             <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center cursor-pointer hover:border-brand-500 transition mb-4 relative">
               <input
