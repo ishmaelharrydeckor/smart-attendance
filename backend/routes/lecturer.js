@@ -4,6 +4,10 @@ const db = require('../db');
 const { authenticateToken, requireRole, requireLecturerOrTA, requireCourseAccess } = require('../middleware/auth');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
+const AdmZip = require('adm-zip');
+
+
 
 // Apply authentication to all lecturer endpoints
 router.use(authenticateToken);
@@ -515,6 +519,46 @@ router.get('/courses/:id/report', requireRole('lecturer'), requireCourseAccess, 
     res.json(result.rows);
   } catch (error) {
     console.error('Error getting course report:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Download personal QR codes for all enrolled students in a ZIP archive
+router.get('/courses/:id/download-qrs-zip', requireRole('lecturer'), requireCourseAccess, async (req, res) => {
+  try {
+    const courseResult = await db.query("SELECT name, code FROM courses WHERE id = $1", [req.params.id]);
+    if (courseResult.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+    const course = courseResult.rows[0];
+
+    const enrollResult = await db.query(
+      `SELECT u.id, u.name, u.student_id 
+       FROM course_enrollments ce
+       JOIN users u ON ce.student_id = u.id
+       WHERE ce.course_id = $1`,
+      [req.params.id]
+    );
+
+    const students = enrollResult.rows;
+    if (students.length === 0) {
+      return res.status(400).json({ error: 'No students enrolled in this course.' });
+    }
+
+    const zip = new AdmZip();
+
+    for (const student of students) {
+      const qrBuffer = await QRCode.toBuffer(student.student_id, { width: 350, margin: 2 });
+      const safeName = student.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${safeName}_${student.student_id}.png`;
+      zip.addFile(filename, qrBuffer);
+    }
+
+    const zipBuffer = zip.toBuffer();
+    const cleanCourseCode = course.code.trim().replace(/[^a-zA-Z0-9]/g, '_');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=qrcodes-${cleanCourseCode}.zip`);
+    res.send(zipBuffer);
+  } catch (error) {
+    console.error('Error generating QR codes ZIP:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

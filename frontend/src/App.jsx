@@ -3226,7 +3226,7 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
           <body>
             <h2>Personal QR Code Sheets - ${course.name} (${course.code})</h2>
             <button class="no-print" onclick="window.print()" style="padding: 10px 20px; margin-bottom: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #999;">Print Now</button>
-            <button class="no-print" id="email-btn" onclick="emailQRCodes()" style="padding: 10px 20px; margin-bottom: 20px; margin-left: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #4f46e5; background-color: #4f46e5; color: white;">Email QR Codes to Students</button>
+            <button class="no-print" id="download-zip-btn" onclick="downloadZip()" style="padding: 10px 20px; margin-bottom: 20px; margin-left: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; border: 1px solid #4f46e5; background-color: #4f46e5; color: white;">Download all QR Codes (ZIP)</button>
             <div class="grid">
               ${studentCardsHtml}
             </div>
@@ -3235,25 +3235,35 @@ function CourseReportCard({ course, apiFetch, showToast, settings }) {
                 ${qrScripts}
               }, 300);
 
-              async function emailQRCodes() {
-                const btn = document.getElementById('email-btn');
+              async function downloadZip() {
+                const btn = document.getElementById('download-zip-btn');
                 btn.disabled = true;
-                btn.innerText = 'Sending Emails...';
+                btn.innerText = 'Generating ZIP...';
                 try {
-                  const res = await fetch('${window.location.origin}/api/lecturer/courses/${course.id}/email-qrs', {
-                    method: 'POST',
+                  const res = await fetch('${window.location.origin}/api/lecturer/courses/${course.id}/download-qrs-zip', {
+                    method: 'GET',
                     headers: {
                       'Authorization': 'Bearer ${localStorage.getItem('token')}'
                     }
                   });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || 'Failed to email QRs');
-                  alert(data.message || 'QR codes emailed successfully!');
+                  if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to download ZIP');
+                  }
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'qrcodes-${course.code.trim().replace(/[^a-zA-Z0-9]/g, '_')}.zip';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
                 } catch (err) {
                   alert(err.message);
                 } finally {
                   btn.disabled = false;
-                  btn.innerText = 'Email QR Codes to Students';
+                  btn.innerText = 'Download all QR Codes (ZIP)';
                 }
               }
             </script>
