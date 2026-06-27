@@ -1903,54 +1903,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               </div>
             </div>
 
-            {/* Flagged Students Section */}
-            <div className="premium-card p-6 mt-8">
-              <h3 className="text-lg font-bold mb-2">Flagged Students</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Students flagged for low attendance or frequent early check-outs.</p>
-              
-              {flaggedStudents.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">No flagged students in this course.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-slate-500 text-xs font-bold uppercase">
-                        <th className="p-3">Student Name</th>
-                        <th className="p-3">Student ID</th>
-                        <th className="p-3">Attendance Rate</th>
-                        <th className="p-3">Early Leaver Rate</th>
-                        <th className="p-3 text-right">Flags</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-sm">
-                      {flaggedStudents.map((stud, idx) => {
-                        const attRate = stud.total > 0 ? Math.round((stud.attended / stud.total) * 100) : 100;
-                        const earlyRate = stud.attended > 0 ? Math.round((stud.early_leavers / stud.attended) * 100) : 0;
-                        const lowAtt = attRate < settings.minThreshold;
-                        const freqEarly = earlyRate > settings.frequentEarlyLeaverThreshold;
-                        
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                            <td className="p-3 font-semibold">{stud.name}</td>
-                            <td className="p-3">{stud.academic_student_id}</td>
-                            <td className={`p-3 font-bold ${lowAtt ? 'text-red-500' : 'text-emerald-500'}`}>{attRate}%</td>
-                            <td className={`p-3 font-bold ${freqEarly ? 'text-red-500' : 'text-slate-500'}`}>{earlyRate}%</td>
-                            <td className="p-3 text-right space-x-1">
-                              {lowAtt && (
-                                <span className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded-lg">Low Attendance</span>
-                              )}
-                              {freqEarly && (
-                                <span className="bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-2 py-1 rounded-lg">Frequent Early Leaver</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+
+
 
           </div>
         )
