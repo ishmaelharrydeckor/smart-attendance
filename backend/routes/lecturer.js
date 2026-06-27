@@ -556,7 +556,8 @@ router.get('/courses/:id/download-qrs-zip', requireRole('lecturer'), requireCour
     const cleanCourseCode = course.code.trim().replace(/[^a-zA-Z0-9]/g, '_');
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename=qrcodes-${cleanCourseCode}.zip`);
-    res.send(zipBuffer);
+    res.setHeader('Content-Length', zipBuffer.length);
+    res.end(zipBuffer, 'binary');
   } catch (error) {
     console.error('Error generating QR codes ZIP:', error);
     res.status(500).json({ error: 'Internal server error' });
