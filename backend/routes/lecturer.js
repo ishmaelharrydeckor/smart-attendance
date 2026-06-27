@@ -540,7 +540,8 @@ router.post('/courses/:id/bulk-enroll', requireRole('lecturer'), requireCourseAc
 
     for (const s of students) {
       const name = s.name || s.Name;
-      const studentId = s.student_id || s['Student ID'];
+      const studentId = s.student_id || s['Student ID'] || s['Reference Number'] || s['Ref Number'];
+      const indexNumber = s.index_number || s['Index Number'] || null;
       const level = s.level || s.Level;
       const email = s.email || s.Email;
 
@@ -548,14 +549,14 @@ router.post('/courses/:id/bulk-enroll', requireRole('lecturer'), requireCourseAc
         continue;
       }
 
-      // Check duplicate student_id registered under a different email
+      // Check duplicate student_id or index_number registered under a different email
       const checkIdResult = await db.query(
-        'SELECT email FROM users WHERE student_id = $1',
-        [studentId]
+        'SELECT email FROM users WHERE student_id = $1 OR (index_number IS NOT NULL AND index_number = $2)',
+        [studentId, indexNumber]
       );
       if (checkIdResult.rows.length > 0 && checkIdResult.rows[0].email !== email) {
         return res.status(400).json({
-          error: `Student ID ${studentId} is already registered under email ${checkIdResult.rows[0].email}`
+          error: `Student ID ${studentId} or Index Number ${indexNumber} is already registered under email ${checkIdResult.rows[0].email}`
         });
       }
 
@@ -568,17 +569,17 @@ router.post('/courses/:id/bulk-enroll', requireRole('lecturer'), requireCourseAc
 
       if (userResult.rows.length > 0) {
         userId = userResult.rows[0].id;
-        // Update student_id and level if not set
+        // Update student_id, index_number, and level if not set
         await db.query(
-          'UPDATE users SET student_id = COALESCE(student_id, $1), level = COALESCE(level, $2) WHERE id = $3',
-          [studentId, level.toString(), userId]
+          'UPDATE users SET student_id = COALESCE(student_id, $1), index_number = COALESCE(index_number, $2), level = COALESCE(level, $3) WHERE id = $4',
+          [studentId, indexNumber, level.toString(), userId]
         );
       } else {
         const insertUser = await db.query(
-          `INSERT INTO users (name, email, password_hash, role, student_id, level)
-           VALUES ($1, $2, $3, 'student', $4, $5)
+          `INSERT INTO users (name, email, password_hash, role, student_id, index_number, level)
+           VALUES ($1, $2, $3, 'student', $4, $5, $6)
            RETURNING id`,
-          [name, email, hash, studentId, level.toString()]
+          [name, email, hash, studentId, indexNumber, level.toString()]
         );
         userId = insertUser.rows[0].id;
       }

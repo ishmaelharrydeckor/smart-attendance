@@ -10,7 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_me_in_
 
 // Student Registration
 router.post('/register', async (req, res) => {
-  const { name, email, password, student_id, level, course_ids } = req.body;
+  const { name, email, password, student_id, index_number, level, course_ids } = req.body;
 
   if (!name || !email || !password || !student_id || !level) {
     return res.status(400).json({ error: 'All student details are required.' });
@@ -39,14 +39,14 @@ router.post('/register', async (req, res) => {
       }
     }
 
-    // Check if email or student ID exists
+    // Check if email, student ID (Ref Number), or index number exists
     const checkUser = await db.query(
-      'SELECT id FROM users WHERE email = $1 OR student_id = $2',
-      [email, student_id]
+      'SELECT id FROM users WHERE email = $1 OR student_id = $2 OR (index_number IS NOT NULL AND index_number = $3)',
+      [email, student_id, index_number || null]
     );
 
     if (checkUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Email or Student ID already exists.' });
+      return res.status(400).json({ error: 'Email, Student ID, or Index Number already exists.' });
     }
 
     // Hash password
@@ -55,9 +55,9 @@ router.post('/register', async (req, res) => {
 
     // Insert user
     const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, student_id, level)
-       VALUES ($1, $2, $3, 'student', $4, $5) RETURNING id, name, email, role, student_id, level`,
-      [name, email, passwordHash, student_id, level]
+      `INSERT INTO users (name, email, password_hash, role, student_id, index_number, level)
+       VALUES ($1, $2, $3, 'student', $4, $5, $6) RETURNING id, name, email, role, student_id, index_number, level`,
+      [name, email, passwordHash, student_id, index_number || null, level]
     );
 
     const studentDbId = newUser.rows[0].id;
@@ -74,7 +74,7 @@ router.post('/register', async (req, res) => {
 
     // Generate Token
     const token = jwt.sign(
-      { id: studentDbId, role: 'student', name, student_id },
+      { id: studentDbId, role: 'student', name, student_id, index_number: index_number || null },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -99,10 +99,10 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // Try email first, then student_id
+    // Try email first, then student_id (Ref Number), then index_number
     const userResult = await db.query(
-      'SELECT * FROM users WHERE email = $1 OR student_id = $2',
-      [login_id, login_id]
+      'SELECT * FROM users WHERE email = $1 OR student_id = $2 OR index_number = $3',
+      [login_id, login_id, login_id]
     );
 
     if (userResult.rows.length === 0) {
@@ -119,7 +119,7 @@ router.post('/login', async (req, res) => {
 
     // Generate Token
     const token = jwt.sign(
-      { id: user.id, role: user.role, name: user.name, student_id: user.student_id },
+      { id: user.id, role: user.role, name: user.name, student_id: user.student_id, index_number: user.index_number },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -133,6 +133,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         student_id: user.student_id,
+        index_number: user.index_number,
         level: user.level
       }
     });

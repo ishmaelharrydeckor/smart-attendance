@@ -755,12 +755,12 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
         ) : (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Email or Student ID</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Email, Reference Number or Index Number</label>
               <input
                 type="text"
                 required
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none"
-                placeholder="lecturer@university.edu or STU001"
+                placeholder="e.g. 20612345, 2234567, or user@st.knust.edu.gh"
                 value={loginId}
                 onChange={e => setLoginId(e.target.value)}
               />
@@ -1235,14 +1235,15 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       const validated = parsed.map(item => {
         return {
           name: item.Name || item.name || '',
-          student_id: item['Student ID'] || item['Index Number'] || item['Reference Number'] || item['Ref Number'] || item.student_id || item.index_number || item.reference_number || item.ref_number || '',
+          student_id: item['Student ID'] || item['Reference Number'] || item['Ref Number'] || item.student_id || item.reference_number || item.ref_number || '',
+          index_number: item['Index Number'] || item.index_number || '',
           level: item.Level || item.level || '',
           email: item.Email || item.email || ''
         };
       }).filter(s => s.name && s.student_id && s.level && s.email);
 
       if (validated.length === 0) {
-        showToast('No valid student records found. Check headers: Name, Student ID (or Index/Ref Number), Level, Email', 'error');
+        showToast('No valid student records found. Check headers: Name, Student ID (or Reference Number), Level, Email', 'error');
         return;
       }
 
@@ -2778,7 +2779,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-800/60 font-bold border-b border-slate-100 dark:border-slate-800 text-slate-500 uppercase">
                       <th className="p-3">Name</th>
-                      <th className="p-3">Student ID</th>
+                      <th className="p-3">Reference / Student ID</th>
+                      <th className="p-3">Index Number</th>
                       <th className="p-3">Level</th>
                       <th className="p-3">Email</th>
                     </tr>
@@ -2788,6 +2790,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                       <tr key={idx}>
                         <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">{s.name}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{s.student_id}</td>
+                        <td className="p-3 text-slate-600 dark:text-slate-400">{s.index_number || 'N/A'}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{s.level}</td>
                         <td className="p-3 text-slate-600 dark:text-slate-400">{s.email}</td>
                       </tr>
