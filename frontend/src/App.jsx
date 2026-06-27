@@ -1907,14 +1907,14 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Academic Year</label>
-                <select
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 2024/2025"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium dark:text-white"
                   value={createCourseYear}
                   onChange={e => setCreateCourseYear(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium dark:text-white"
-                >
-                  <option value="2024/2025" className="text-slate-900">2024/2025</option>
-                  <option value="2025/2026" className="text-slate-900">2025/2026</option>
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Semester</label>
