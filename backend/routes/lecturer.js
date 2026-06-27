@@ -16,6 +16,13 @@ router.get('/dashboard-stats', requireLecturerOrTA, requireCourseAccess, async (
   try {
     const threshold = parseFloat(min_threshold || '75');
 
+    // Fetch the course to check if there is a manual total_sessions value
+    const courseResult = await db.query(
+      "SELECT total_sessions FROM courses WHERE id = $1",
+      [course_id]
+    );
+    const courseLimit = courseResult.rows[0]?.total_sessions;
+
     // 1. Total enrolled students in this course
     const totalStudentsResult = await db.query(
       "SELECT COUNT(*) FROM course_enrollments WHERE course_id = $1",
@@ -27,12 +34,13 @@ router.get('/dashboard-stats', requireLecturerOrTA, requireCourseAccess, async (
       "SELECT COUNT(*) FROM sessions WHERE course_id = $1",
       [course_id]
     );
+    const sessionsHeld = parseInt(totalSessionsResult.rows[0].count) || 0;
+    const totalSessions = courseLimit !== null && courseLimit !== undefined ? courseLimit : sessionsHeld;
 
     // 3. Average attendance rate for this course
     const overallResult = await db.query(`
       SELECT 
-        COUNT(CASE WHEN ar.is_present = true THEN 1 END) as present_count,
-        COUNT(*) as total_count
+        COUNT(CASE WHEN ar.is_present = true THEN 1 END) as present_count
       FROM attendance_records ar
       JOIN sessions s ON ar.session_id = s.id
       WHERE s.course_id = $1
@@ -42,14 +50,14 @@ router.get('/dashboard-stats', requireLecturerOrTA, requireCourseAccess, async (
     const belowThresholdResult = await db.query(`
       SELECT COUNT(*) FROM (
         SELECT ce.student_id,
-               COUNT(CASE WHEN ar.is_present = true THEN 1 END)::float / NULLIF(COUNT(DISTINCT s.id), 0) * 100 as rate
+               COUNT(CASE WHEN ar.is_present = true THEN 1 END)::float as attended_count
          FROM course_enrollments ce
-         JOIN sessions s ON ce.course_id = s.course_id
+         LEFT JOIN sessions s ON ce.course_id = s.course_id
          LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.student_id = ce.student_id
          WHERE ce.course_id = $1
          GROUP BY ce.student_id
-       ) sub WHERE COALESCE(rate, 100) < $2
-     `, [course_id, threshold]);
+       ) sub WHERE COALESCE((attended_count / NULLIF($3, 0)) * 100, 100) < $2
+     `, [course_id, threshold, totalSessions]);
  
      // 5. Average duration minutes
      const avgDurationResult = await db.query(
@@ -70,12 +78,11 @@ router.get('/dashboard-stats', requireLecturerOrTA, requireCourseAccess, async (
      );
  
      const totalStudents = parseInt(totalStudentsResult.rows[0].count) || 0;
-     const totalSessions = parseInt(totalSessionsResult.rows[0].count) || 0;
      const studentsBelowThreshold = parseInt(belowThresholdResult.rows[0].count) || 0;
      
      const presentCount = parseInt(overallResult.rows[0].present_count) || 0;
-     const totalCount = parseInt(overallResult.rows[0].total_count) || 0;
-     const overallPercentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 100;
+     const totalPotentialCheckins = totalStudents * totalSessions;
+     const overallPercentage = totalPotentialCheckins > 0 ? Math.round((presentCount / totalPotentialCheckins) * 100) : 100;
      
      const avgDuration = Math.round(parseFloat(avgDurationResult.rows[0].avg_duration || '0'));
      const earlyLeaversCount = parseInt(earlyLeaversResult.rows[0].early_leavers_count) || 0;
@@ -494,7 +501,7 @@ router.get('/courses/:id/report', requireRole('lecturer'), requireCourseAccess, 
          ar.checkout_timestamp as checkout_time,
          ar.duration_minutes,
          ar.attendance_status,
-         (SELECT COUNT(*) FROM sessions WHERE course_id = $1) as total_sessions,
+         COALESCE((SELECT total_sessions FROM courses WHERE id = $1), (SELECT COUNT(*) FROM sessions WHERE course_id = $1)) as total_sessions,
          (SELECT COUNT(CASE WHEN is_present = true THEN 1 END) FROM attendance_records WHERE student_id = u.id AND session_id IN (SELECT id FROM sessions WHERE course_id = $1)) as attended_sessions,
          (SELECT COUNT(CASE WHEN attendance_status = 'early_leaver' THEN 1 END) FROM attendance_records WHERE student_id = u.id AND session_id IN (SELECT id FROM sessions WHERE course_id = $1)) as early_leaver_sessions
        FROM course_enrollments ce
