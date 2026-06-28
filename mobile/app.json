@@ -46,10 +46,7 @@
       ],
       "expo-asset",
       "expo-camera",
-      "expo-location",
-      [
-        "expo-keep-awake"
-      ]
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
