@@ -812,14 +812,24 @@ export default function DashboardScreen() {
                         </View>
                       </View>
                     ) : (
-                      <TouchableOpacity
-                        style={styles.startSessionButtonFull}
-                        onPress={() => handleStartSession(selectedCourse.id)}
-                        activeOpacity={0.75}
-                      >
-                        <Ionicons name="play" size={18} color={Colors.White} />
-                        <Text style={styles.startSessionButtonFullText}>Start Session</Text>
-                      </TouchableOpacity>
+                      <View style={{ flex: 1 }}>
+                        <TouchableOpacity
+                          style={styles.startSessionButtonFull}
+                          onPress={() => handleStartSession(selectedCourse.id)}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="play" size={18} color={Colors.White} />
+                          <Text style={styles.startSessionButtonFullText}>Start Session</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.lecturerNoSessionContainer}>
+                          <Ionicons name="calendar-outline" size={56} color="#9CA3AF" />
+                          <Text style={styles.lecturerNoSessionTitle}>No active session</Text>
+                          <Text style={styles.lecturerNoSessionSubtext}>
+                            Start a session to begin taking attendance
+                          </Text>
+                        </View>
+                      </View>
                     )}
                   </View>
                 )}
@@ -1097,7 +1107,7 @@ export default function DashboardScreen() {
             {([
               { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline' },
               { id: 'live', label: 'Live', icon: 'flash-outline' },
-              { id: 'reports', label: 'Reports', icon: 'file-text-outline' },
+              { id: 'reports', label: 'Reports', icon: 'document-text-outline' },
               user?.role === 'lecturer' && { id: 'invites', label: 'Invites', icon: 'people-outline' },
               { id: 'settings', label: 'Settings', icon: 'settings-outline' },
             ].filter(Boolean) as any[]).map((tab) => {
@@ -1434,13 +1444,13 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: 8,
   },
   statsCardMetric: {
     flex: 1,
     backgroundColor: Colors.Neutral100,
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    padding: Spacing.sm,
     alignItems: 'center',
   },
   statsCardMetricValue: {
@@ -1886,5 +1896,24 @@ const styles = StyleSheet.create({
   lateBadge: {
     backgroundColor: Colors.WarningLight,
     color: Colors.Warning,
+  },
+  lecturerNoSessionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 48,
+  },
+  lecturerNoSessionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#4B5563',
+    marginTop: 12,
+  },
+  lecturerNoSessionSubtext: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 32,
   },
 });
