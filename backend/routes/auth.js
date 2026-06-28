@@ -54,11 +54,26 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // Insert user
-    const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, student_id, index_number, level)
-       VALUES ($1, $2, $3, 'student', $4, $5, $6) RETURNING id, name, email, role, student_id, index_number, level`,
-      [name, email, passwordHash, student_id, index_number || null, level]
-    );
+    let newUser;
+    try {
+      newUser = await db.query(
+        `INSERT INTO users (name, email, password_hash, role, student_id, index_number, level)
+         VALUES ($1, $2, $3, 'student', $4, $5, $6) RETURNING id, name, email, role, student_id, index_number, level`,
+        [name, email, passwordHash, student_id, index_number || null, level]
+      );
+    } catch (dbErr) {
+      if (dbErr.code === '23505') {
+        const detail = dbErr.detail || '';
+        if (detail.includes('student_id')) {
+          return res.status(409).json({ error: 'A student with this ID is already registered.' });
+        }
+        if (detail.includes('email')) {
+          return res.status(409).json({ error: 'An account with this email already exists.' });
+        }
+        return res.status(409).json({ error: 'This account already exists.' });
+      }
+      throw dbErr;
+    }
 
     const studentDbId = newUser.rows[0].id;
 
