@@ -57,6 +57,17 @@ interface InviteCode {
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  const handleLogoutConfirmation = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: logout }
+      ]
+    );
+  };
   
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -562,7 +573,7 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.avatar} onPress={logout} activeOpacity={0.75}>
+          <TouchableOpacity style={styles.avatar} onPress={handleLogoutConfirmation} activeOpacity={0.75}>
             <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
           </TouchableOpacity>
         </View>
