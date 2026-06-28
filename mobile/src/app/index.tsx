@@ -408,7 +408,7 @@ export default function DashboardScreen() {
     setLoading(true);
     try {
       await apiFetch(`/api/lecturer/sessions/${sessionId}/toggle`, {
-        method: 'POST',
+        method: 'PUT',
         body: JSON.stringify({ is_active: false }),
       });
       setActiveSession(null);
