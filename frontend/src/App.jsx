@@ -35,10 +35,15 @@ import {
   Sun,
   Moon,
   Menu,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+
+const APK_VERSION = '1.0.0';
+const APK_DOWNLOAD_URL = 'https://github.com/ishmaelharrydeckor/smart-attendance/releases/download/v1.0.0/smartroll-preview.apk';
+const APK_SIZE_MB = '21.5';
 
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
 const DEFAULT_SETTINGS = {
@@ -67,6 +72,8 @@ export default function App() {
   // Academic Period State
   const [academicPeriods, setAcademicPeriods] = useState([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
+
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
 
   // Global Toast Notification
   const [toast, setToast] = useState(null);
@@ -267,7 +274,17 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-             <button
+            <a
+              href={APK_DOWNLOAD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              title="Download Android App"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Download App</span>
+            </a>
+            <button
               onClick={() => setDarkMode(!darkMode)}
               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
             >
@@ -297,7 +314,7 @@ export default function App() {
       )}
 
       {!user ? (
-        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} />
+        <AuthScreen onAuthSuccess={(t, u) => { setToken(t); setUser(u); showToast(`Welcome back, ${u.name}!`); }} showToast={showToast} apiFetch={apiFetch} setShowInstallInstructions={setShowInstallInstructions} />
       ) : (user.role === 'lecturer' || user.role === 'ta') ? (
         <LecturerConsole
           user={user}
@@ -401,6 +418,51 @@ export default function App() {
           </form>
         </div>
       )}
+
+      {/* Installation Instructions Modal Overlay */}
+      {showInstallInstructions && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
+            <h3 className="font-bold text-lg mb-2">How to install SmartRoll on Android</h3>
+            <p className="text-slate-500 text-xs mb-4">Follow these simple steps to manually install the app.</p>
+            
+            <div className="space-y-4 mb-6 text-left">
+              <div>
+                <p className="text-sm font-semibold">Step 1: Download the APK</p>
+                <p className="text-slate-500 text-xs">Tap the Download button. Your browser will download the SmartRoll APK file.</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Step 2: Open the file</p>
+                <p className="text-slate-500 text-xs">Open your phone's Downloads folder (or tap the notification) and tap the smartroll-preview.apk file.</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Step 3: Allow installation</p>
+                <p className="text-slate-500 text-xs">If prompted with "Install unknown apps", tap Settings → enable "Allow from this source" → go back and tap Install.</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Step 4: Open SmartRoll</p>
+                <p className="text-slate-500 text-xs">Once installed, open SmartRoll from your app drawer. Log in with your student ID and password, or register if you're a new student.</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl mb-6 text-left border border-slate-100 dark:border-slate-800/60">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                <strong>Note:</strong> SmartRoll is not available on the Google Play Store. You must install it directly using this APK file. This is safe — the app is built and distributed by KNUST.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowInstallInstructions(false)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold rounded-xl text-sm transition hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -408,7 +470,7 @@ export default function App() {
 // -------------------------------------------------------------
 // AUTHENTICATION SCREEN (LOGIN & REGISTER)
 // -------------------------------------------------------------
-function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
+function AuthScreen({ onAuthSuccess, showToast, apiFetch, setShowInstallInstructions }) {
   const [isRegister, setIsRegister] = useState(false);
   const [isStaffRegister, setIsStaffRegister] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -542,7 +604,7 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
+    <div className="min-h-[80vh] flex flex-col lg:flex-row items-center justify-center gap-8 p-4 w-full max-w-6xl mx-auto">
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 shadow-xl">
         <div className="text-center mb-8">
           <div className="inline-flex bg-brand-500 text-white p-3.5 rounded-2xl shadow-lg shadow-brand-500/30 mb-4">
@@ -801,6 +863,49 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
 
           </form>
         )}
+      </div>
+
+      {/* Landing page Download card */}
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col items-center text-center self-start lg:self-center">
+        <div className="inline-flex bg-indigo-500 text-white p-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 mb-4">
+          <Smartphone className="w-6 h-6" />
+        </div>
+        <h3 className="text-xl font-bold tracking-tight mb-2 text-slate-800 dark:text-slate-100">Get the SmartRoll App</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+          Download the Android app to check in to your classes using QR codes.
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
+          <a
+            href={APK_DOWNLOAD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition w-full sm:w-auto"
+          >
+            <Download className="w-4 h-4" />
+            Download APK
+          </a>
+          
+          {/* Desktop Only QR Code */}
+          <div className="hidden sm:block border border-slate-200 dark:border-slate-800 p-2 rounded-xl bg-white">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=96&data=${encodeURIComponent(APK_DOWNLOAD_URL)}`}
+              alt="Scan to Download APK"
+              className="w-24 h-24"
+            />
+          </div>
+        </div>
+
+        <div className="text-xs text-slate-400 dark:text-slate-500 mt-6 space-y-2">
+          <p>Android only · Version {APK_VERSION} · ~{APK_SIZE_MB} MB</p>
+          <button
+            type="button"
+            onClick={() => setShowInstallInstructions(true)}
+            className="text-indigo-600 font-semibold hover:underline"
+          >
+            How to install →
+          </button>
+        </div>
       </div>
     </div>
   );
