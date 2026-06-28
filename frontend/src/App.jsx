@@ -3152,6 +3152,26 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           </div>
         </div>
       )}
+      {/* Lecturer Camera QR scanner for student cards */}
+      {lecturerScannerOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold">Scan Student Card</h3>
+              <button
+                onClick={() => {
+                  if (lecturerScannerInstance.current) lecturerScannerInstance.current.clear();
+                  setLecturerScannerOpen(false);
+                }}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <div id="lecturer-qr-reader-container" ref={lecturerScannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3685,26 +3705,6 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
         </div>
       )}
 
-      {/* Lecturer Camera QR scanner for student cards */}
-      {lecturerScannerOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold">Scan Student Card</h3>
-              <button
-                onClick={() => {
-                  if (lecturerScannerInstance.current) lecturerScannerInstance.current.clear();
-                  setLecturerScannerOpen(false);
-                }}
-                className="text-slate-500 hover:text-slate-700"
-              >
-                Close
-              </button>
-            </div>
-            <div id="lecturer-qr-reader-container" ref={lecturerScannerRef} className="overflow-hidden rounded-xl border-2 qr-scanner-box"></div>
-          </div>
-        </div>
-      )}
 
 
       {/* Code check-in/out overlay */}
