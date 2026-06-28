@@ -31,7 +31,11 @@ import {
   EyeOff,
   ArrowLeft,
   Upload,
-  Printer
+  Printer,
+  Sun,
+  Moon,
+  Menu,
+  X
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -250,7 +254,7 @@ export default function App() {
 
 
       {/* Top Banner Navigation */}
-      {user && (
+      {user && user.role === 'student' && (
         <nav className="sticky top-0 z-40 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-brand-600 text-white p-2.5 rounded-xl shadow-lg shadow-brand-500/20">
@@ -263,19 +267,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {user && user.role === 'lecturer' && academicPeriods.length > 0 && (
-              <select
-                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer font-medium"
-                value={selectedPeriodId}
-                onChange={e => setSelectedPeriodId(e.target.value)}
-              >
-                {academicPeriods.map(p => (
-                  <option key={p.id} value={p.id}>
-                    Semester {p.semester} ({p.academic_year})
-                  </option>
-                ))}
-              </select>
-            )}
              <button
               onClick={() => setDarkMode(!darkMode)}
               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -320,6 +311,10 @@ export default function App() {
           selectedPeriodId={selectedPeriodId}
           setAcademicPeriods={setAcademicPeriods}
           setSelectedPeriodId={setSelectedPeriodId}
+          logout={logout}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          setChangePasswordOpen={setChangePasswordOpen}
         />
       ) : (
         <StudentConsole
@@ -812,8 +807,9 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch }) {
 }
 
 // -------------------------------------------------------------
-function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch, academicPeriods, selectedPeriodId, setAcademicPeriods, setSelectedPeriodId }) {
+function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings, showToast, apiFetch, academicPeriods, selectedPeriodId, setAcademicPeriods, setSelectedPeriodId, logout, darkMode, setDarkMode, setChangePasswordOpen }) {
   const [stats, setStats] = useState({ totalStudents: 0, totalSessions: 0, studentsBelowThreshold: 0, overallPercentage: 100, avgDuration: 0, earlyLeaversCount: 0 });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [newYear, setNewYear] = useState('');
   const [newSemester, setNewSemester] = useState('1');
   const [newIsCurrent, setNewIsCurrent] = useState(false);
@@ -1237,7 +1233,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       });
       showToast(`Student ${decodedStudentId} checked in successfully!`);
       const updatedList = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
-      setLiveAttendanceList(updatedList);
+      setLiveAttendanceList(updatedList.records || []);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1353,7 +1349,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       showToast('Attendance corrected with audit log successfully!');
       setOverrideModalOpen(false);
       const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
-      setLiveAttendanceList(list);
+      setLiveAttendanceList(list.records || []);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1451,7 +1447,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
         // Fetch attendance live lists
         const list = await apiFetch(`/api/lecturer/sessions/${sessionId}/live-attendance`);
-        setLiveAttendanceList(list);
+        setLiveAttendanceList(list.records || []);
       } catch (err) {
         console.error(err);
       }
@@ -1471,7 +1467,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       showToast('Attendance updated successfully');
       // reload live list
       const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
-      setLiveAttendanceList(list);
+      setLiveAttendanceList(list.records || []);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1501,7 +1497,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       });
       showToast('Student checked out manually.');
       const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
-      setLiveAttendanceList(list);
+      setLiveAttendanceList(list.records || []);
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1528,7 +1524,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
         showToast(res.message);
         // reload live list
         const list = await apiFetch(`/api/lecturer/sessions/${activeSession.id}/live-attendance`);
-        setLiveAttendanceList(list);
+        setLiveAttendanceList(list.records || []);
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -1537,32 +1533,116 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* Tab Switchers */}
-      <div className="flex gap-2 overflow-x-auto pb-4 border-b border-slate-200 dark:border-slate-800 mb-8">
-        {[
-          { id: 'dashboard', label: selectedCourseId ? 'Dashboard' : 'My Courses', icon: Users },
-          user.role === 'lecturer' && { id: 'courses', label: 'Manage Courses', icon: BookOpen },
-          selectedCourseId && { id: 'sessions', label: 'Sessions', icon: Calendar },
-          activeSession && { id: 'live-session', label: 'Live Active Session', icon: RefreshCw },
-          user.role === 'lecturer' && selectedCourseId && { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
-          user.role === 'lecturer' && { id: 'invites', label: 'Invite & Access', icon: UserPlus },
-          user.role === 'lecturer' && { id: 'settings', label: 'Settings', icon: Settings }
-        ].filter(Boolean).map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition shrink-0 ${
-              activeTab === tab.id
-                ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/10'
-                : 'bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-300">
+      {/* SIDEBAR NAVIGATION */}
+      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800/80 transition-all duration-300 flex flex-col justify-between z-30 shrink-0`}>
+        <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
+          {/* Logo & Header */}
+          <div className="flex items-center justify-between px-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-brand-600 text-white p-2.5 rounded-xl shadow-lg shadow-brand-500/20">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              {!sidebarCollapsed && (
+                <div>
+                  <h1 className="font-bold text-lg leading-none tracking-tight">SmartRoll</h1>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Console</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Academic Period Selector inside Sidebar */}
+          {!sidebarCollapsed && academicPeriods.length > 0 && (
+            <div className="px-4 mb-6">
+              <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1">Academic Period</label>
+              <select
+                className="w-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer font-medium"
+                value={selectedPeriodId}
+                onChange={e => setSelectedPeriodId(e.target.value)}
+              >
+                {academicPeriods.map(p => (
+                  <option key={p.id} value={p.id}>
+                    Sem {p.semester} ({p.academic_year})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Nav buttons */}
+          <nav className="flex-1 px-3 space-y-1">
+            {[
+              { id: 'dashboard', label: selectedCourseId ? 'Dashboard' : 'My Courses', icon: Users },
+              user.role === 'lecturer' && { id: 'courses', label: 'Manage Courses', icon: BookOpen },
+              selectedCourseId && { id: 'sessions', label: 'Sessions', icon: Calendar },
+              activeSession && { id: 'live-session', label: 'Live Active Session', icon: RefreshCw },
+              user.role === 'lecturer' && selectedCourseId && { id: 'reports', label: 'Export Reports', icon: FileSpreadsheet },
+              user.role === 'lecturer' && { id: 'invites', label: 'Invite & Access', icon: UserPlus },
+              user.role === 'lecturer' && { id: 'settings', label: 'Settings', icon: Settings }
+            ].filter(Boolean).map(tab => {
+              const isTabActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  title={tab.label}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition ${
+                    isTabActive
+                      ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/10'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <tab.icon className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span className="truncate">{tab.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Info & Toggles Footer */}
+        <div className="p-4 border-t border-slate-200/85 dark:border-slate-800/85 bg-slate-50/50 dark:bg-slate-900/50">
+          {!sidebarCollapsed && (
+            <div className="mb-4">
+              <p className="font-semibold text-sm truncate">{user.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user.role} {user.student_id ? `(${user.student_id})` : ''}</p>
+            </div>
+          )}
+          <div className={`flex ${sidebarCollapsed ? 'flex-col items-center gap-3' : 'justify-between items-center'}`}>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              title="Toggle Dark Mode"
+            >
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => setChangePasswordOpen(true)}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              title="Change Password"
+            >
+              <Key className="w-4 h-4" />
+            </button>
+            <button
+              onClick={logout}
+              className="p-2 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60 transition"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN MAIN VIEW CONTENT CONTAINER */}
+      <main className="flex-1 overflow-y-auto px-8 py-8">
 
       {/* DASHBOARD TAB */}
       {activeTab === 'dashboard' && (
@@ -3172,7 +3252,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           </div>
         </div>
       )}
-    </div>
+    </main></div>
   );
 }
 

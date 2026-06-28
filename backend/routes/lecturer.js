@@ -390,6 +390,26 @@ router.post('/sessions/:id/activate-checkout', requireLecturerOrTA, requireCours
   }
 });
 
+// Deactivate checkout for session
+router.put('/sessions/:id/deactivate-checkout', requireLecturerOrTA, requireCourseAccess, async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE sessions 
+       SET checkout_qr_token = NULL, 
+           checkout_qr_expires_at = NULL, 
+           checkout_session_code = NULL, 
+           checkout_code_expires_at = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error deactivating checkout:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 5. Attendance Operations (Live List / Manual Mark)
 router.get('/sessions/:id/live-attendance', requireLecturerOrTA, requireCourseAccess, async (req, res) => {
   try {
@@ -419,7 +439,20 @@ router.get('/sessions/:id/live-attendance', requireLecturerOrTA, requireCourseAc
        ORDER BY u.name ASC`,
       [req.params.id]
     );
-    res.json(result.rows);
+    const enrolledRes = await db.query(
+      `SELECT COUNT(*)::integer FROM course_enrollments ce
+       JOIN sessions s ON ce.course_id = s.course_id
+       WHERE s.id = $1`,
+      [req.params.id]
+    );
+    const totalEnrolled = enrolledRes.rows[0]?.count || 0;
+    const checkedInCount = result.rows.filter(r => r.is_present).length;
+
+    res.json({
+      records: result.rows,
+      total_enrolled: totalEnrolled,
+      checked_in_count: checkedInCount
+    });
   } catch (error) {
     console.error('Error fetching live attendance:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -726,7 +759,7 @@ router.get('/sessions/:sessionId/audit-logs', requireLecturerOrTA, requireCourse
   try {
     const logs = await db.query(
       `SELECT 
-         l.id, l.old_value, l.new_value, l.reason, l.timestamp,
+         l.id, l.record_id, l.old_value, l.new_value, l.reason, l.timestamp,
          u_lecturer.name as changed_by_name,
          u_student.name as student_name,
          u_student.student_id as academic_student_id
