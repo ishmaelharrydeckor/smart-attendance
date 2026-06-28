@@ -869,6 +869,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
   const qrPollInterval = useRef(null);
+  const sessionPollInterval = useRef(null);
 
   // Lecturer QR Card Scanner states
   const [lecturerScannerOpen, setLecturerScannerOpen] = useState(false);
@@ -1148,6 +1149,39 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       if (timer) clearInterval(timer);
     };
   }, [activeSession?.id, secondsRemaining === 0]);
+
+  useEffect(() => {
+    if (sessionPollInterval.current) {
+      clearInterval(sessionPollInterval.current);
+      sessionPollInterval.current = null;
+    }
+
+    if (activeSession && activeSession.is_active && activeSession.id) {
+      sessionPollInterval.current = setInterval(async () => {
+        try {
+          const data = await apiFetch(`/api/lecturer/sessions?course_id=${activeSession.course_id}`);
+          const s = data.find(item => item.id === activeSession.id);
+          if (!s || !s.is_active) {
+            setActiveSession(null);
+            showToast('Session ended automatically', 'info');
+            if (sessionPollInterval.current) {
+              clearInterval(sessionPollInterval.current);
+              sessionPollInterval.current = null;
+            }
+          }
+        } catch (e) {
+          console.warn('Session status poll error:', e.message);
+        }
+      }, 30000);
+    }
+
+    return () => {
+      if (sessionPollInterval.current) {
+        clearInterval(sessionPollInterval.current);
+        sessionPollInterval.current = null;
+      }
+    };
+  }, [activeSession?.id, activeSession?.is_active]);
 
   const createCourse = async (e) => {
     e.preventDefault();
