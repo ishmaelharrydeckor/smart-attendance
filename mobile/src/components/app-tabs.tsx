@@ -1,3 +1,4 @@
+import { Slot } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useColorScheme } from 'react-native';
 
@@ -27,6 +28,9 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+      
+      {/* Render active screen page content */}
+      <Slot />
     </NativeTabs>
   );
 }
