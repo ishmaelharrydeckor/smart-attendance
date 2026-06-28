@@ -8,7 +8,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://smart-attendance-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://smart-attendance-gf6k.onrender.com"
       }
     },
     "production": {
