@@ -45,6 +45,39 @@ async function runBackup() {
 
     const stats = fs.statSync(filepath);
     logMessage(`Backup completed successfully. Saved to ${filename} (${(stats.size / 1024).toFixed(2)} KB)`);
+
+    // Cloudflare R2 upload
+    const date = new Date().toISOString().split('T')[0];
+    try {
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const r2AccountId = process.env.R2_ACCOUNT_ID;
+      const r2AccessKey = process.env.R2_ACCESS_KEY_ID;
+      const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY;
+      const r2Bucket = process.env.R2_BUCKET_NAME;
+
+      if (r2AccountId && r2AccessKey && r2SecretKey && r2Bucket) {
+        const s3Client = new S3Client({
+          endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+          credentials: {
+            accessKeyId: r2AccessKey,
+            secretAccessKey: r2SecretKey,
+          },
+          region: 'auto',
+        });
+
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: r2Bucket,
+            Key: `backups/smartroll-${date}.json`,
+            Body: fs.readFileSync(filepath),
+            ContentType: 'application/json',
+          })
+        );
+        console.log(`Backup uploaded to R2: backups/smartroll-${date}.json`);
+      }
+    } catch (r2Error) {
+      console.error(r2Error);
+    }
   } catch (error) {
     logMessage(`Backup failed: ${error.message}`);
     process.exit(1);
