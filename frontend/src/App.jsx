@@ -2400,6 +2400,25 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                         <td className="p-3 text-slate-400 capitalize text-xs">{methodStr}</td>
                         <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{durationStr}</td>
                         <td className="p-3 text-right space-x-2">
+                          {item.is_present && (
+                            <>
+                              {item.attendance_status === 'late' && (
+                                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold border inline-block" style={{ backgroundColor: '#FFFBEB', color: '#D97706', borderColor: '#D97706' }}>
+                                  Late
+                                </span>
+                              )}
+                              {item.attendance_status === 'early_leaver' && (
+                                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200 inline-block">
+                                  Early leaver
+                                </span>
+                              )}
+                              {item.attendance_status === 'present' && (
+                                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 inline-block">
+                                  Present
+                                </span>
+                              )}
+                            </>
+                          )}
                           <button
                             onClick={() => handleOpenOverrideModal(item.student_id, item.is_present, item.attendance_status)}
                             className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition"

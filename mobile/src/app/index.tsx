@@ -966,17 +966,13 @@ export default function DashboardScreen() {
                               <View style={styles.studentListRowRight}>
                                 <Text style={styles.studentListTime}>{checkinTime}</Text>
                                 <View style={styles.studentListBadgesRow}>
-                                  <View style={[
-                                    styles.studentStatusPill,
-                                    item.attendance_status === 'present' ? styles.pillSuccess : styles.pillWarning
-                                  ]}>
-                                    <Text style={[
-                                      styles.studentStatusPillText,
-                                      item.attendance_status === 'present' ? styles.pillSuccessText : styles.pillWarningText
-                                    ]}>
-                                      {item.attendance_status === 'present' ? 'Present' : 'Late'}
-                                    </Text>
-                                  </View>
+                                  {item.attendance_status && item.attendance_status !== 'present' && (
+                                    <View style={item.attendance_status === 'late' ? styles.pillLate : styles.pillEarly}>
+                                      <Text style={item.attendance_status === 'late' ? styles.pillLateText : styles.pillEarlyText}>
+                                        {item.attendance_status === 'late' ? 'Late' : 'Early'}
+                                      </Text>
+                                    </View>
+                                  )}
                                   {item.checkout_timestamp && (
                                     <View style={styles.studentCheckoutPill}>
                                       <Text style={styles.studentCheckoutPillText}>Out</Text>
@@ -1713,18 +1709,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
   },
-  pillSuccess: {
-    backgroundColor: Colors.SuccessLight,
+  pillLate: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#D97706',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  pillWarning: {
-    backgroundColor: Colors.WarningLight,
-  },
-  studentStatusPillText: {
-    ...Typography.Caption,
+  pillLateText: {
+    color: '#D97706',
+    fontSize: 11,
     fontWeight: '600',
   },
-  pillSuccessText: {
-    color: Colors.Success,
+  pillEarly: {
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#E65100',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  pillEarlyText: {
+    color: '#E65100',
+    fontSize: 11,
+    fontWeight: '600',
   },
   pillWarningText: {
     color: Colors.Warning,
