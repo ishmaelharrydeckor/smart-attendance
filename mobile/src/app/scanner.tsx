@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
