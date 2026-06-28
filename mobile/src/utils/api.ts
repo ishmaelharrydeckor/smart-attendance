@@ -1,4 +1,6 @@
-const BASE_URL = 'http://100.112.21.176:5000';
+// Render free tier spins down after 15 minutes of inactivity. The first API request after sleep takes 30-60 seconds.
+// Set up a free uptime monitor at https://uptimerobot.com checking https://smart-attendance-api.onrender.com/api/health every 10 minutes to keep it awake.
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://smart-attendance-api.onrender.com';
 
 let authToken: string | null = null;
 

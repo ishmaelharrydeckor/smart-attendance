@@ -1,16 +1,26 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "SmartRoll",
+    "slug": "smartroll",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
+    "platforms": ["android"],
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.smartroll.attendance",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,7 +44,12 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-camera",
+      "expo-location",
+      [
+        "expo-keep-awake"
+      ]
     ],
     "experiments": {
       "typedRoutes": true

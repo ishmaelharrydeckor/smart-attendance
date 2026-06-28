@@ -42,6 +42,9 @@ app.use('/api/sessions', sessionRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date() });
 });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 const { autoCloseSessions } = require('./scripts/session-cleanup');
 
