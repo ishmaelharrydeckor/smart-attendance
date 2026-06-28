@@ -18,6 +18,9 @@ import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Papa from 'papaparse';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../theme';
@@ -489,6 +492,44 @@ export default function DashboardScreen() {
     );
   }
 
+  const handleExportCSV = async () => {
+    if (history.length === 0) {
+      Alert.alert('No records', 'No attendance records to export');
+      return;
+    }
+
+    try {
+      const csvData = history.map((record) => {
+        const checkinTime = record.timestamp || record.checkin_time
+          ? new Date(record.timestamp || record.checkin_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '--:--';
+        const checkoutTime = record.checkout_timestamp || record.checkout_time
+          ? new Date(record.checkout_timestamp || record.checkout_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '--:--';
+        return {
+          'Date': new Date(record.timestamp || record.checkin_time).toLocaleDateString(),
+          'Course Code': record.course_code || '',
+          'Course Name': record.course_name || '',
+          'Check-in Time': checkinTime,
+          'Check-out Time': checkoutTime,
+          'Duration (mins)': record.duration_minutes || record.duration || '--',
+          'Status': record.attendance_status || 'present',
+        };
+      });
+
+      const csvString = Papa.unparse(csvData);
+      const fileUri = FileSystem.cacheDirectory + 'smartroll_attendance.csv';
+      await FileSystem.writeAsStringAsync(fileUri, csvString, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      await Sharing.shareAsync(fileUri);
+      Alert.alert('Success', 'Attendance records exported successfully.');
+    } catch (err: any) {
+      Alert.alert('Export Failed', err.message || 'Could not export attendance data.');
+    }
+  };
+
   const checkedInStudents = liveAttendance.filter((r) => r.is_present);
 
   // Avatar initials helper
@@ -716,6 +757,41 @@ export default function DashboardScreen() {
               );
             })}
           </ScrollView>
+
+          {/* Attendance History Section with CSV Export Button */}
+          <View style={styles.historyHeaderRow}>
+            <Text style={styles.sectionHeaderTitle}>Attendance History</Text>
+            <TouchableOpacity
+              style={styles.exportBtn}
+              onPress={handleExportCSV}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="download-outline" size={18} color={Colors.Neutral600} />
+            </TouchableOpacity>
+          </View>
+
+          {history.length === 0 ? (
+            <Text style={styles.emptyText}>No check-ins recorded yet.</Text>
+          ) : (
+            history.map((record: any, index: number) => (
+              <View key={index} style={styles.itemRow}>
+                <View>
+                  <Text style={styles.itemName}>{record.course_name}</Text>
+                  <Text style={styles.itemMeta}>
+                    Date: {new Date(record.timestamp || record.checkin_time).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.statusBadge,
+                    record.attendance_status === 'present' ? styles.presentBadge : styles.lateBadge,
+                  ]}
+                >
+                  {record.attendance_status || 'present'}
+                </Text>
+              </View>
+            ))
+          )}
         </ScrollView>
       ) : (
         // LECTURER / TA PORTAL VIEW
@@ -1915,5 +1991,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 32,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  exportBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.Neutral100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.Card,
   },
 });
