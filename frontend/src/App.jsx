@@ -1159,8 +1159,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     if (activeSession && activeSession.is_active && activeSession.id) {
       sessionPollInterval.current = setInterval(async () => {
         try {
-          const data = await apiFetch(`/api/lecturer/sessions?course_id=${activeSession.course_id}`);
-          const s = data.find(item => item.id === activeSession.id);
+          const s = await apiFetch(`/api/sessions/${activeSession.id}/qr-status`);
           if (!s || !s.is_active) {
             setActiveSession(null);
             showToast('Session ended automatically', 'info');
