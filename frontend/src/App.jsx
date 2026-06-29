@@ -42,7 +42,7 @@ import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const APK_VERSION = '1.0.0';
-const APK_DOWNLOAD_URL = 'https://expo.dev/artifacts/eas/fXbwnGyY4R_3-9GqWO4gQG_aApD5plocBe9m9UEXO3A.apk';
+const APK_DOWNLOAD_URL = 'https://expo.dev/artifacts/eas/iVc-bkVmr8SF-M1jHBPQzMtu2bABZ7-HvFc6xJNIe-U.apk';
 const APK_SIZE_MB = '11.5';
 
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
