@@ -11,6 +11,7 @@ import {
   TextInput,
   Animated,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ import Papa from 'papaparse';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '../theme';
 
@@ -57,6 +59,8 @@ interface InviteCode {
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const { isOnline, queueLength, clearQueue } = useOfflineQueue(); // Get offline queue details for profile view
 
   const handleLogoutConfirmation = () => {
     Alert.alert(
@@ -531,7 +535,7 @@ export default function DashboardScreen() {
       const csvString = Papa.unparse(csvData);
       const fileUri = FileSystem.cacheDirectory + 'smartroll_attendance.csv';
       await FileSystem.writeAsStringAsync(fileUri, csvString, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: 'utf8',
       });
 
       await Sharing.shareAsync(fileUri);
@@ -573,7 +577,7 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.avatar} onPress={handleLogoutConfirmation} activeOpacity={0.75}>
+          <TouchableOpacity style={styles.avatar} onPress={() => setProfileMenuVisible(true)} activeOpacity={0.75}>
             <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
           </TouchableOpacity>
         </View>
@@ -1213,6 +1217,102 @@ export default function DashboardScreen() {
           </View>
         </View>
       )}
+      {/* Profile Menu Modal Overlay */}
+      <Modal
+        visible={profileMenuVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setProfileMenuVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header / Close */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalHeaderTitle}>Account Profile</Text>
+              <TouchableOpacity onPress={() => setProfileMenuVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={Colors.Neutral600} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Profile Info Card */}
+            <View style={styles.profileCard}>
+              <View style={styles.profileAvatarBig}>
+                <Text style={styles.profileAvatarTextBig}>{getInitials(user?.name)}</Text>
+              </View>
+              <Text style={styles.profileName}>{user?.name}</Text>
+              <Text style={styles.profileRole}>{user?.role?.toUpperCase()}</Text>
+              <Text style={styles.profileEmail}>{user?.email || user?.student_id || 'User account'}</Text>
+            </View>
+
+            {/* Offline Sync Status Section */}
+            <View style={styles.syncSection}>
+              <View style={styles.syncRow}>
+                <View style={styles.syncIconContainer}>
+                  <Ionicons 
+                    name={isOnline ? "cloud-done-outline" : "cloud-offline-outline"} 
+                    size={20} 
+                    color={isOnline ? "#059669" : "#D97706"} 
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.syncTitle}>Connection Status</Text>
+                  <Text style={styles.syncSubtitle}>
+                    {isOnline ? "Online — database connected" : "Offline mode — changes cached"}
+                  </Text>
+                </View>
+                <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#D1FAE5' : '#FEF3C7' }]}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: isOnline ? '#065F46' : '#92400E' }}>
+                    {isOnline ? "ONLINE" : "OFFLINE"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.syncRow, { marginTop: 16 }]}>
+                <View style={styles.syncIconContainer}>
+                  <Ionicons name="sync-outline" size={20} color={Colors.Brand600} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.syncTitle}>Offline Sync Queue</Text>
+                  <Text style={styles.syncSubtitle}>
+                    {queueLength} pending check-in requests
+                  </Text>
+                </View>
+                {queueLength > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Alert.alert(
+                        'Clear Queue',
+                        'Are you sure you want to clear your local offline check-in queue?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Clear', style: 'destructive', onPress: () => { clearQueue(); Alert.alert('Success', 'Offline queue cleared.'); } }
+                        ]
+                      );
+                    }}
+                    style={styles.clearQueueBtn}
+                  >
+                    <Text style={styles.clearQueueBtnText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Valuable Actions */}
+            <View style={{ marginTop: 'auto', marginBottom: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setProfileMenuVisible(false);
+                  handleLogoutConfirmation();
+                }}
+                style={styles.logoutButton}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                <Text style={styles.logoutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2027,5 +2127,134 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.Card,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.White,
+    borderTopLeftRadius: BorderRadius.xl * 1.5,
+    borderTopRightRadius: BorderRadius.xl * 1.5,
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xl + 12,
+    minHeight: 450,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.Neutral800,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  profileCard: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.Neutral200,
+    marginBottom: Spacing.xl,
+  },
+  profileAvatarBig: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.Brand100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  profileAvatarTextBig: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.Brand700,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.Neutral800,
+  },
+  profileRole: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.Brand600,
+    letterSpacing: 1,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  profileEmail: {
+    fontSize: 13,
+    color: Colors.Neutral500,
+  },
+  syncSection: {
+    backgroundColor: Colors.White,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.Neutral200,
+    marginBottom: Spacing.xl,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.Neutral800,
+  },
+  syncSubtitle: {
+    fontSize: 12,
+    color: Colors.Neutral500,
+    marginTop: 1,
+  },
+  statusIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  clearQueueBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+  },
+  clearQueueBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    backgroundColor: '#FEF2F2',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    gap: 8,
+  },
+  logoutButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });
