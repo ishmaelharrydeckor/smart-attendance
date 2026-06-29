@@ -868,8 +868,9 @@ export default function DashboardScreen() {
             const activeSessionRecord = activeSession ? history.find((h: any) => h.session_id === activeSession.id) : null;
             const isCheckedIn = !!activeSessionRecord;
             const hasCheckedOut = !!(activeSessionRecord?.checkout_timestamp || activeSessionRecord?.checkout_time);
+            const checkoutIsOpen = activeSession?.checkout_active === true;
             
-            if (activeSession && activeSession.checkout_qr_token && isCheckedIn && !hasCheckedOut) {
+            if (checkoutIsOpen && isCheckedIn && !hasCheckedOut) {
               return (
                 <View style={styles.checkoutPillCard}>
                   <View style={styles.checkoutPillLeft}>

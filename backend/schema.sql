@@ -73,7 +73,8 @@ CREATE TABLE sessions (
     checkout_session_code VARCHAR(20),
     checkout_code_expires_at TIMESTAMP WITH TIME ZONE,
     checkout_window_minutes INTEGER DEFAULT 10,
-    early_leaver_threshold_minutes INTEGER DEFAULT 15
+    early_leaver_threshold_minutes INTEGER DEFAULT 15,
+    checkout_active BOOLEAN DEFAULT FALSE
 );
 
 -- 5. Attendance Records Table

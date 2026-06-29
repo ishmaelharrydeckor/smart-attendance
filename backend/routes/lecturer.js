@@ -377,7 +377,8 @@ router.post('/sessions/:id/activate-checkout', requireLecturerOrTA, requireCours
            checkout_session_code = $3, 
            checkout_code_expires_at = $4,
            checkout_window_minutes = $5,
-           early_leaver_threshold_minutes = $6
+           early_leaver_threshold_minutes = $6,
+           checkout_active = TRUE
        WHERE id = $7
        RETURNING *`,
       [qrToken, expiresAt, sessionCode, expiresAt, windowMins, thresholdMins, req.params.id]
@@ -398,7 +399,8 @@ router.put('/sessions/:id/deactivate-checkout', requireLecturerOrTA, requireCour
        SET checkout_qr_token = NULL, 
            checkout_qr_expires_at = NULL, 
            checkout_session_code = NULL, 
-           checkout_code_expires_at = NULL
+           checkout_code_expires_at = NULL,
+           checkout_active = FALSE
        WHERE id = $1
        RETURNING *`,
       [req.params.id]
