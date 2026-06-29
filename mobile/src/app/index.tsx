@@ -835,7 +835,7 @@ export default function DashboardScreen() {
             const isCheckedIn = !!activeSessionRecord;
             const hasCheckedOut = !!(activeSessionRecord?.checkout_timestamp || activeSessionRecord?.checkout_time);
             
-            if (activeSession && activeSession.checkout_active && isCheckedIn && !hasCheckedOut) {
+            if (activeSession && activeSession.checkout_qr_token && isCheckedIn && !hasCheckedOut) {
               return (
                 <View style={styles.checkoutPillCard}>
                   <View style={styles.checkoutPillLeft}>
