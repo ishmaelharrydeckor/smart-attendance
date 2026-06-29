@@ -3870,7 +3870,7 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
 
       {/* Main Check-in / Check-out Hub */}
       {!activeCheckin ? (
-        <div className="premium-card p-6 bg-gradient-to-br from-brand-600 to-indigo-800 text-white border-0 shadow-lg shadow-brand-500/20 flex flex-col items-center justify-center text-center">
+        <div className="premium-card p-6 text-white border-0 shadow-lg shadow-brand-500/20 flex flex-col items-center justify-center text-center" style={{ background: 'linear-gradient(to bottom right, #2563eb, #4f46e5)' }}>
           <h3 className="text-xl font-bold">Class Attendance Panel</h3>
           <p className="text-white/80 text-xs mt-1">Verify attendance by checking in or checking out using QR codes or numeric codes.</p>
           
@@ -3895,7 +3895,7 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
 
         </div>
       ) : (
-        <div className="premium-card p-6 bg-gradient-to-br from-indigo-650 to-indigo-900 text-white border-0 shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center text-center">
+        <div className="premium-card p-6 text-white border-0 shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center text-center" style={{ background: 'linear-gradient(to bottom right, #4f46e5, #312e81)' }}>
           <span className="text-[10px] bg-white/20 text-white font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-2">Checked In</span>
           <h3 className="text-xl font-bold">{activeCheckin.course_code} - {activeCheckin.course_name}</h3>
           <p className="text-white/80 text-xs mt-1">Check-in recorded at {new Date(activeCheckin.timestamp).toLocaleTimeString()}</p>
