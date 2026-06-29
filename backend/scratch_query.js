@@ -7,8 +7,22 @@ const pool = new Pool({
 
 async function run() {
   try {
-    const res = await pool.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'sessions'");
-    console.log("Columns of sessions table:", res.rows);
+    const q = `
+      SELECT s.id, s.date, s.start_time, c.name as course_name, c.code,
+             u.name as lecturer_name
+      FROM sessions s
+      JOIN courses c ON s.course_id = c.id
+      JOIN users u ON c.lecturer_id = u.id
+      WHERE c.code = (
+        SELECT code FROM courses
+        WHERE lecturer_id = (SELECT id FROM users WHERE role = 'lecturer' LIMIT 1)
+        ORDER BY id ASC
+        LIMIT 1
+      )
+      ORDER BY s.start_time DESC;
+    `;
+    const res = await pool.query(q);
+    console.log("Sessions matching first course:", res.rows);
   } catch (err) {
     console.error(err);
   } finally {

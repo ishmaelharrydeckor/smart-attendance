@@ -753,6 +753,73 @@ router.post('/sessions/:sessionId/override', requireLecturerOrTA, requireCourseA
   }
 });
 
+// Reassign a session to a correct course
+router.put('/sessions/:id/reassign', requireLecturerOrTA, requireCourseAccess, async (req, res) => {
+  const { course_id } = req.body;
+  const sessionId = req.params.id;
+
+  if (!course_id) {
+    return res.status(400).json({ error: 'target course_id is required.' });
+  }
+
+  try {
+    // 1. Verify lecturer has access to target course
+    const targetCourseRes = await db.query('SELECT lecturer_id FROM courses WHERE id = $1', [course_id]);
+    if (targetCourseRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Target course not found.' });
+    }
+    if (req.user.role === 'lecturer' && targetCourseRes.rows[0].lecturer_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access forbidden. You do not own the target course.' });
+    }
+
+    // 2. Fetch session details before update to log
+    const sessionRes = await db.query('SELECT * FROM sessions WHERE id = $1', [sessionId]);
+    if (sessionRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found.' });
+    }
+    const session = sessionRes.rows[0];
+    const oldCourseId = session.course_id;
+
+    if (oldCourseId === parseInt(course_id)) {
+      return res.status(400).json({ error: 'Session is already assigned to this course.' });
+    }
+
+    // 3. Begin transaction
+    await db.query('BEGIN');
+
+    // Update sessions table
+    await db.query('UPDATE sessions SET course_id = $1 WHERE id = $2', [course_id, sessionId]);
+
+    // Fetch all attendance records for this session to audit log them
+    const recordsRes = await db.query('SELECT id FROM attendance_records WHERE session_id = $1', [sessionId]);
+    const records = recordsRes.rows;
+
+    // Log the change in attendance_audit_logs for each record
+    for (const record of records) {
+      await db.query(
+        `INSERT INTO attendance_audit_logs (record_id, changed_by, old_value, new_value, reason)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [record.id, req.user.id, `Course: ${oldCourseId}`, `Course: ${course_id}`, 'Session reassigned due to course launch bug']
+      );
+    }
+
+    await db.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Session reassigned successfully.',
+      session_id: sessionId,
+      old_course_id: oldCourseId,
+      new_course_id: course_id,
+      audited_records_count: records.length
+    });
+  } catch (error) {
+    await db.query('ROLLBACK');
+    console.error('Error reassigning session:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Fetch Audit Logs for a Session
 router.get('/sessions/:sessionId/audit-logs', requireLecturerOrTA, requireCourseAccess, async (req, res) => {
   const { sessionId } = req.params;
