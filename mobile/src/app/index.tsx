@@ -225,7 +225,7 @@ export default function DashboardScreen() {
     try {
       const historyData = await apiFetch('/api/student/history');
       setHistory(historyData);
-      const active = historyData.find((h: any) => !h.checkout_time);
+      const active = historyData.find((h: any) => !h.checkout_time && h.is_active);
       if (active) {
         setActiveCheckin(active);
       } else {

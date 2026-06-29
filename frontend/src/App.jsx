@@ -3631,10 +3631,11 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
     }
   };
 
-  // Find check-in without check-out
+  // Find check-in without check-out (only active if the session itself is still active)
   const activeCheckin = history.find(log => 
     log.is_present && 
     !log.checkout_timestamp &&
+    log.is_active &&
     (new Date() - new Date(log.timestamp)) < 4 * 60 * 60 * 1000 // Checked in within last 4 hours
   );
 

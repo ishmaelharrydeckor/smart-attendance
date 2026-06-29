@@ -150,7 +150,7 @@ router.get('/history', async (req, res) => {
          ar.timestamp, ar.method, ar.is_present,
          ar.checkout_timestamp, ar.duration_minutes, ar.attendance_status,
          s.date, s.start_time, s.end_time, s.id as session_id,
-         s.checkout_qr_token, s.checkout_window_minutes,
+         s.checkout_qr_token, s.checkout_window_minutes, s.is_active,
          c.name as course_name, c.code as course_code
        FROM attendance_records ar
        JOIN sessions s ON ar.session_id = s.id
@@ -176,6 +176,7 @@ router.get('/active-session', async (req, res) => {
        JOIN courses c ON s.course_id = c.id
        JOIN course_enrollments ce ON s.course_id = ce.course_id
        WHERE ce.student_id = $1 AND s.is_active = true AND s.end_time > CURRENT_TIMESTAMP
+       ORDER BY s.start_time DESC
        LIMIT 1`,
       [req.user.id]
     );
