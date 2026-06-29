@@ -42,8 +42,8 @@ import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const APK_VERSION = '1.0.0';
-const APK_DOWNLOAD_URL = 'https://github.com/ishmaelharrydeckor/smart-attendance/releases/download/v1.0.0/smartroll-preview.apk';
-const APK_SIZE_MB = '21.5';
+const APK_DOWNLOAD_URL = 'https://expo.dev/artifacts/eas/wMr6gY5HoKWOhAx2aUXRCJH5hVl9IhRf-NHJMiQYUJM.apk';
+const APK_SIZE_MB = '11.5';
 
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
 const DEFAULT_SETTINGS = {
