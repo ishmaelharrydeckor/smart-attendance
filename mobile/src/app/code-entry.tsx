@@ -102,7 +102,7 @@ export default function CodeEntryScreen() {
           <Ionicons name="cloud-offline-outline" size={80} color={Colors.Warning} />
           <Text style={styles.successTitle}>Check-in Saved Offline</Text>
           <Text style={styles.noteText}>
-            Your check-in has been saved and will be submitted automatically when you reconnect.
+            Your check-in has been saved. Session codes stay valid until the session ends, so this will sync successfully when you reconnect.
           </Text>
         </View>
 

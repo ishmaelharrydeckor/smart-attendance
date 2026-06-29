@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch } from '../utils/api';
@@ -182,6 +183,14 @@ export function useOfflineQueue() {
           stopFlushing = true;
         } else {
           // Client error (4xx): remove from queue (never succeeds)
+          const errorMsg = err.message || '';
+          const isQrExpiry = errorMsg.toLowerCase().includes('expired') || errorMsg.toLowerCase().includes('invalid');
+          if (isQrExpiry && req.endpoint.includes('/check-in/qr')) {
+            Alert.alert(
+              'Check-in Sync Failed',
+              'Your QR check-in could not be submitted — the code expired while you were offline. Please ask your lecturer to manually mark you present, or use the session code next time for reliable offline check-in.'
+            );
+          }
           console.warn(`Dropping request ${req.id} due to client error:`, err.message);
         }
       }

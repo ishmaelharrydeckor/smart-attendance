@@ -23,7 +23,7 @@ export default function ScannerScreen() {
   const isCheckout = params.action === 'checkout' || params.mode === 'checkout';
   const sessionId = params.sessionId || params.session_id;
 
-  const { enqueue } = useOfflineQueue();
+  const { enqueue, isOnline } = useOfflineQueue();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -277,6 +277,15 @@ export default function ScannerScreen() {
 
         {/* Floating Bottom status sheet */}
         <View style={styles.bottomSheet}>
+          {!isOnline && !isCheckout && (
+            <View style={styles.offlineWarningBanner}>
+              <Ionicons name="warning" size={14} color="#ffc107" />
+              <Text style={styles.offlineWarningText}>
+                You're offline — QR check-in may not work if you reconnect after 1 minute. Use 'Enter code instead' for reliable offline check-in.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.statusRow}>
             <Animated.View style={[
               styles.statusDot,
@@ -476,5 +485,23 @@ const styles = StyleSheet.create({
     ...Typography.Heading,
     color: Colors.White,
     fontWeight: '600',
+  },
+  offlineWarningBanner: {
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    borderColor: '#ffc107',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    width: '100%',
+  },
+  offlineWarningText: {
+    ...Typography.Caption,
+    color: '#ffc107',
+    fontWeight: '500',
+    flex: 1,
   },
 });

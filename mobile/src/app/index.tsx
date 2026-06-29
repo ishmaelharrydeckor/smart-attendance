@@ -794,24 +794,58 @@ export default function DashboardScreen() {
                       </View>
                     )}
 
-                    <TouchableOpacity
-                      style={styles.primaryCheckinBtn}
-                      onPress={() => router.push('/scanner')}
-                      disabled={windowClosed}
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons name="qr-code-outline" size={20} color={Colors.Primary} />
-                      <Text style={styles.primaryCheckinBtnText}>Scan QR Code</Text>
-                    </TouchableOpacity>
+                    {!isOnline && (
+                      <View style={styles.offlineWarningBanner}>
+                        <Ionicons name="warning" size={16} color="#ffc107" />
+                        <Text style={styles.offlineWarningText}>
+                          You're offline — QR check-in may not work if you reconnect after 1 minute. Use 'Enter code instead' for reliable offline check-in.
+                        </Text>
+                      </View>
+                    )}
 
-                    <TouchableOpacity
-                      style={styles.secondaryCheckinLink}
-                      onPress={() => router.push('/code-entry')}
-                      disabled={windowClosed}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={styles.secondaryCheckinLinkText}>Enter code instead →</Text>
-                    </TouchableOpacity>
+                    {isOnline ? (
+                      <>
+                        <TouchableOpacity
+                          style={styles.primaryCheckinBtn}
+                          onPress={() => router.push('/scanner')}
+                          disabled={windowClosed}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="qr-code-outline" size={20} color={Colors.Primary} />
+                          <Text style={styles.primaryCheckinBtnText}>Scan QR Code</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.secondaryCheckinLink}
+                          onPress={() => router.push('/code-entry')}
+                          disabled={windowClosed}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={styles.secondaryCheckinLinkText}>Enter code instead →</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <>
+                        <TouchableOpacity
+                          style={styles.primaryCheckinBtn}
+                          onPress={() => router.push('/code-entry')}
+                          disabled={windowClosed}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="keypad-outline" size={20} color={Colors.Primary} />
+                          <Text style={styles.primaryCheckinBtnText}>Enter Code Instead</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.secondaryCheckinLink}
+                          onPress={() => router.push('/scanner')}
+                          disabled={windowClosed}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={styles.secondaryCheckinLinkText}>Scan QR Code instead →</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 );
               })()}
@@ -2539,5 +2573,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  offlineWarningBanner: {
+    backgroundColor: 'rgba(241, 196, 15, 0.2)',
+    borderColor: '#f1c40f',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  offlineWarningText: {
+    fontSize: 12,
+    color: '#f1c40f',
+    fontWeight: '500',
+    flex: 1,
   },
 });
