@@ -874,12 +874,9 @@ export default function DashboardScreen() {
             contentContainerStyle={styles.horizontalScrollContent}
           >
             {courses.map((course) => {
-              const courseRecords = history.filter(
-                (h) => h.course_code === course.code || h.course_name === course.name
-              );
-              const total = courseRecords.length || 5;
-              const attended = courseRecords.filter((r) => r.is_present || r.timestamp || r.checkin_time).length || 4;
-              const percentage = total > 0 ? Math.round((attended / total) * 100) : 80;
+              const total = course.total_sessions !== undefined && course.total_sessions !== null ? Number(course.total_sessions) : 0;
+              const attended = course.attended !== undefined && course.attended !== null ? Number(course.attended) : 0;
+              const percentage = total > 0 ? Math.round((attended / total) * 100) : 100;
 
               // Color coding
               let percentColor = Colors.Neutral900;
