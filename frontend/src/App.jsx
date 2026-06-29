@@ -1504,7 +1504,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
   };
 
   const startSession = async () => {
-    const courseId = selectedCourseForSession || selectedCourseId;
+    const courseId = selectedCourseId;
     if (!courseId) return showToast('Please select a course', 'error');
     
     let locationName = 'Lecturer Live Location';

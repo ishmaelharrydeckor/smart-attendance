@@ -7,11 +7,8 @@ const pool = new Pool({
 
 async function run() {
   try {
-    const records = await pool.query('SELECT * FROM attendance_records WHERE student_id = 54');
-    console.log('Attendance Records for Student 54:', records.rows);
-
-    const enrollments = await pool.query('SELECT * FROM course_enrollments WHERE student_id = 54');
-    console.log('Enrollments for Student 54:', enrollments.rows);
+    const res = await pool.query('SELECT s.id, s.course_id, s.is_active, s.start_time, s.end_time, c.name, c.code FROM sessions s JOIN courses c ON s.course_id = c.id WHERE s.is_active = true');
+    console.log('Active Sessions:', res.rows);
   } catch (err) {
     console.error(err);
   } finally {
