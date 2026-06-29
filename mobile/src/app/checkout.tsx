@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Animated,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -208,132 +210,138 @@ export default function CheckoutScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER SECTION */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
-          <Ionicons name="arrow-back" size={24} color={Colors.Neutral900} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Check out</Text>
-          <Text style={styles.headerSubtitle}>
-            {courseCode} — {courseName}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Method 1: Scan QR */}
-        <TouchableOpacity
-          style={[
-            styles.methodCard,
-            method === 'qr' && styles.methodCardActive,
-          ]}
-          onPress={() => {
-            setMethod('qr');
-            router.push({
-              pathname: '/scanner',
-              params: { mode: 'checkout', session_id: sessionId },
-            });
-          }}
-          activeOpacity={0.75}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons name="qr-code" size={22} color={Colors.Primary} />
-          </View>
-          <View style={styles.methodInfo}>
-            <Text style={styles.methodTitle}>Scan QR code</Text>
-            <Text style={styles.methodDesc}>
-              Point your camera at the checkout QR
+        {/* HEADER SECTION */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
+            <Ionicons name="arrow-back" size={24} color={Colors.Neutral900} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Check out</Text>
+            <Text style={styles.headerSubtitle}>
+              {courseCode} — {courseName}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.Neutral400} />
-        </TouchableOpacity>
+          <View style={{ width: 40 }} />
+        </View>
 
-        {/* Method 2: Enter Code */}
-        <TouchableOpacity
-          style={[
-            styles.methodCard,
-            method === 'code' && styles.methodCardActive,
-          ]}
-          onPress={handleSelectCodeMethod}
-          activeOpacity={0.75}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.iconWrapper}>
-            <Ionicons name="keypad" size={22} color={Colors.Primary} />
-          </View>
-          <View style={styles.methodInfo}>
-            <Text style={styles.methodTitle}>Enter checkout code</Text>
-            <Text style={styles.methodDesc}>
-              Type the code shown by your lecturer
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.Neutral400} />
-        </TouchableOpacity>
+          {/* Method 1: Scan QR */}
+          <TouchableOpacity
+            style={[
+              styles.methodCard,
+              method === 'qr' && styles.methodCardActive,
+            ]}
+            onPress={() => {
+              setMethod('qr');
+              router.push({
+                pathname: '/scanner',
+                params: { mode: 'checkout', session_id: sessionId },
+              });
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={styles.iconWrapper}>
+              <Ionicons name="qr-code" size={22} color={Colors.Primary} />
+            </View>
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodTitle}>Scan QR code</Text>
+              <Text style={styles.methodDesc}>
+                Point your camera at the checkout QR
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.Neutral400} />
+          </TouchableOpacity>
 
-        {/* INLINE CODE ENTRY PANEL (Same OTP block design as code-entry.tsx) */}
-        {method === 'code' && (
-          <View style={styles.codeEntryPanel}>
-            <TextInput
-              ref={hiddenInputRef}
-              style={styles.hiddenInput}
-              value={codeValue}
-              onChangeText={(text) => {
-                const clean = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                setCodeValue(clean);
-                if (clean.length === 6) {
-                  handleSubmitCode(clean);
-                }
-              }}
-              maxLength={6}
-              keyboardType="default"
-              autoCorrect={false}
-              autoCapitalize="characters"
-              editable={!loading}
-            />
+          {/* Method 2: Enter Code */}
+          <TouchableOpacity
+            style={[
+              styles.methodCard,
+              method === 'code' && styles.methodCardActive,
+            ]}
+            onPress={handleSelectCodeMethod}
+            activeOpacity={0.75}
+          >
+            <View style={styles.iconWrapper}>
+              <Ionicons name="keypad" size={22} color={Colors.Primary} />
+            </View>
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodTitle}>Enter checkout code</Text>
+              <Text style={styles.methodDesc}>
+                Type the code shown by your lecturer
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.Neutral400} />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.boxesRow}
-              onPress={() => hiddenInputRef.current?.focus()}
-              activeOpacity={1}
-            >
-              {Array.from({ length: 6 }).map((_, idx) => {
-                const char = codeValue[idx] || '';
-                const isActive = codeValue.length === idx;
-                const isFilled = char !== '';
+          {/* INLINE CODE ENTRY PANEL (Same OTP block design as code-entry.tsx) */}
+          {method === 'code' && (
+            <View style={styles.codeEntryPanel}>
+              <TextInput
+                ref={hiddenInputRef}
+                style={styles.hiddenInput}
+                value={codeValue}
+                onChangeText={(text) => {
+                  const clean = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                  setCodeValue(clean);
+                  if (clean.length === 6) {
+                    handleSubmitCode(clean);
+                  }
+                }}
+                maxLength={6}
+                keyboardType="default"
+                autoCorrect={false}
+                autoCapitalize="characters"
+                editable={!loading}
+              />
 
-                let boxStyle = styles.codeBoxDefault;
-                if (isActive) boxStyle = styles.codeBoxActive;
-                else if (isFilled) boxStyle = styles.codeBoxFilled;
+              <TouchableOpacity
+                style={styles.boxesRow}
+                onPress={() => hiddenInputRef.current?.focus()}
+                activeOpacity={1}
+              >
+                {Array.from({ length: 6 }).map((_, idx) => {
+                  const char = codeValue[idx] || '';
+                  const isActive = codeValue.length === idx;
+                  const isFilled = char !== '';
 
-                return (
-                  <View key={idx} style={[styles.codeBox, boxStyle]}>
-                    <Text style={styles.codeBoxChar}>{char}</Text>
-                  </View>
-                );
-              })}
-            </TouchableOpacity>
+                  let boxStyle = styles.codeBoxDefault;
+                  if (isActive) boxStyle = styles.codeBoxActive;
+                  else if (isFilled) boxStyle = styles.codeBoxFilled;
 
-            {loading && (
-              <View style={styles.loadingSpinnerContainer}>
-                <ActivityIndicator size="small" color={Colors.Primary} />
-                <Text style={styles.loadingSpinnerText}>Verifying checkout code...</Text>
-              </View>
-            )}
+                  return (
+                    <View key={idx} style={[styles.codeBox, boxStyle]}>
+                      <Text style={styles.codeBoxChar}>{char}</Text>
+                    </View>
+                  );
+                })}
+              </TouchableOpacity>
 
-            {inlineError !== '' && (
-              <View style={styles.errorRow}>
-                <Ionicons name="alert-circle-outline" size={16} color={Colors.Danger} />
-                <Text style={styles.errorText}>{inlineError}</Text>
-              </View>
-            )}
-          </View>
-        )}
-      </ScrollView>
+              {loading && (
+                <View style={styles.loadingSpinnerContainer}>
+                  <ActivityIndicator size="small" color={Colors.Primary} />
+                  <Text style={styles.loadingSpinnerText}>Verifying checkout code...</Text>
+                </View>
+              )}
+
+              {inlineError !== '' && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle-outline" size={16} color={Colors.Danger} />
+                  <Text style={styles.errorText}>{inlineError}</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.smartroll.attendance",
+      "softwareKeyboardLayoutMode": "pan",
       "versionCode": 1,
       "permissions": [
         "CAMERA",

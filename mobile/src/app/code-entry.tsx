@@ -10,6 +10,7 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -140,86 +141,91 @@ export default function CodeEntryScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* HEADER BAR */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.75}>
-            <Ionicons name="arrow-back" size={24} color={Colors.Neutral900} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Enter session code</Text>
-            <Text style={styles.headerSubtitle}>
-              {params.course_name || 'Active Course Session'}
-            </Text>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <View style={styles.body}>
-          {/* OTP BOX GRID */}
-          {!loading ? (
-            <TouchableOpacity
-              style={styles.codeContainer}
-              activeOpacity={1}
-              onPress={() => hiddenInputRef.current?.focus()}
-            >
-              {Array.from({ length: 6 }).map((_, idx) => {
-                const char = codeValue[idx] || '';
-                const isActive = codeValue.length === idx;
-                const isFilled = char !== '';
-
-                let boxStyle = styles.codeBoxDefault;
-                if (isActive) boxStyle = styles.codeBoxActive;
-                else if (isFilled) boxStyle = styles.codeBoxFilled;
-
-                return (
-                  <View key={idx} style={[styles.codeBox, boxStyle]}>
-                    <Text style={styles.codeText}>{char}</Text>
-                  </View>
-                );
-              })}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* HEADER BAR */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()} activeOpacity={0.75}>
+              <Ionicons name="arrow-back" size={24} color={Colors.Neutral900} />
             </TouchableOpacity>
-          ) : (
-            <View style={styles.spinnerContainer}>
-              <ActivityIndicator size="small" color={Colors.Primary} />
-            </View>
-          )}
-
-          <TextInput
-            ref={hiddenInputRef}
-            style={styles.hiddenInput}
-            maxLength={6}
-            value={codeValue}
-            onChangeText={handleTextChange}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            keyboardType="default"
-          />
-
-          {errorMsg !== '' && (
-            <View style={styles.errorRow}>
-              <Ionicons name="alert-circle-outline" size={16} color={Colors.Danger} />
-              <Text style={styles.errorText}>{errorMsg}</Text>
-            </View>
-          )}
-
-          {/* Warning Helper card after 3 failed attempts */}
-          {attemptsCount >= 3 && (
-            <View style={styles.troubleCard}>
-              <Text style={styles.troubleText}>
-                Having trouble? Ask your lecturer for the code
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Enter session code</Text>
+              <Text style={styles.headerSubtitle}>
+                {params.course_name || 'Active Course Session'}
               </Text>
-              <TouchableOpacity
-                style={styles.troubleLink}
-                onPress={() => router.replace('/scanner')}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.troubleLinkLabel}>Go back to scanner</Text>
-              </TouchableOpacity>
             </View>
-          )}
-        </View>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.body}>
+            {/* OTP BOX GRID */}
+            {!loading ? (
+              <TouchableOpacity
+                style={styles.codeContainer}
+                activeOpacity={1}
+                onPress={() => hiddenInputRef.current?.focus()}
+              >
+                {Array.from({ length: 6 }).map((_, idx) => {
+                  const char = codeValue[idx] || '';
+                  const isActive = codeValue.length === idx;
+                  const isFilled = char !== '';
+
+                  let boxStyle = styles.codeBoxDefault;
+                  if (isActive) boxStyle = styles.codeBoxActive;
+                  else if (isFilled) boxStyle = styles.codeBoxFilled;
+
+                  return (
+                    <View key={idx} style={[styles.codeBox, boxStyle]}>
+                      <Text style={styles.codeText}>{char}</Text>
+                    </View>
+                  );
+                })}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.spinnerContainer}>
+                <ActivityIndicator size="small" color={Colors.Primary} />
+              </View>
+            )}
+
+            <TextInput
+              ref={hiddenInputRef}
+              style={styles.hiddenInput}
+              maxLength={6}
+              value={codeValue}
+              onChangeText={handleTextChange}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              keyboardType="default"
+            />
+
+            {errorMsg !== '' && (
+              <View style={styles.errorRow}>
+                <Ionicons name="alert-circle-outline" size={16} color={Colors.Danger} />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
+            {/* Warning Helper card after 3 failed attempts */}
+            {attemptsCount >= 3 && (
+              <View style={styles.troubleCard}>
+                <Text style={styles.troubleText}>
+                  Having trouble? Ask your lecturer for the code
+                </Text>
+                <TouchableOpacity
+                  style={styles.troubleLink}
+                  onPress={() => router.replace('/scanner')}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.troubleLinkLabel}>Go back to scanner</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );

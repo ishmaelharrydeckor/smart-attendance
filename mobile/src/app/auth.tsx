@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -27,6 +27,10 @@ interface StaffRegisterPayload {
 
 export default function AuthScreen() {
   const { login, registerStudent, loading: authLoading } = useAuth();
+  const scrollViewRef = useRef<any>(null);
+  const passwordInputRef = useRef<any>(null);
+  const regPasswordInputRef = useRef<any>(null);
+  const staffPasswordInputRef = useRef<any>(null);
   
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -190,12 +194,14 @@ export default function AuthScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Top Branding Section */}
           <View style={styles.topSection}>
@@ -286,13 +292,21 @@ export default function AuthScreen() {
                   ]}
                 >
                   <TextInput
+                    ref={passwordInputRef}
                     style={styles.passwordInput}
                     placeholder="Enter your password"
                     placeholderTextColor={Colors.Neutral400}
                     secureTextEntry={!showLoginPassword}
                     value={password}
                     onChangeText={setPassword}
-                    onFocus={() => setFocusedField('password')}
+                    onFocus={() => {
+                      setFocusedField('password');
+                      setTimeout(() => {
+                        passwordInputRef.current?.measureInWindow((x, y) => {
+                          scrollViewRef.current?.scrollTo({ y: y - 100, animated: true });
+                        });
+                      }, 300);
+                    }}
                     onBlur={() => setFocusedField(null)}
                   />
                   <TouchableOpacity
@@ -379,13 +393,21 @@ export default function AuthScreen() {
                   ]}
                 >
                   <TextInput
+                    ref={regPasswordInputRef}
                     style={styles.passwordInput}
                     placeholder="Create password"
                     placeholderTextColor={Colors.Neutral400}
                     secureTextEntry={!showRegPassword}
                     value={password}
                     onChangeText={setPassword}
-                    onFocus={() => setFocusedField('regPassword')}
+                    onFocus={() => {
+                      setFocusedField('regPassword');
+                      setTimeout(() => {
+                        regPasswordInputRef.current?.measureInWindow((x, y) => {
+                          scrollViewRef.current?.scrollTo({ y: y - 100, animated: true });
+                        });
+                      }, 300);
+                    }}
                     onBlur={() => setFocusedField(null)}
                   />
                   <TouchableOpacity
@@ -524,13 +546,21 @@ export default function AuthScreen() {
                   ]}
                 >
                   <TextInput
+                    ref={staffPasswordInputRef}
                     style={styles.passwordInput}
                     placeholder="Password"
                     placeholderTextColor={Colors.Neutral400}
                     secureTextEntry={!showStaffPassword}
                     value={staffPassword}
                     onChangeText={setStaffPassword}
-                    onFocus={() => setFocusedField('staffPassword')}
+                    onFocus={() => {
+                      setFocusedField('staffPassword');
+                      setTimeout(() => {
+                        staffPasswordInputRef.current?.measureInWindow((x, y) => {
+                          scrollViewRef.current?.scrollTo({ y: y - 100, animated: true });
+                        });
+                      }, 300);
+                    }}
                     onBlur={() => setFocusedField(null)}
                   />
                   <TouchableOpacity
