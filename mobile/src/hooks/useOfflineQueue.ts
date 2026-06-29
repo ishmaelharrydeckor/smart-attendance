@@ -28,14 +28,14 @@ export function useOfflineQueue() {
   useEffect(() => {
     // Initial fetch
     NetInfo.fetch().then((state) => {
-      const online = !!(state.isConnected && state.isInternetReachable);
+      const online = state.isConnected === true;
       setIsOnline(online);
       isOnlineRef.current = online;
     });
 
     // Subscribe to changes
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const online = !!(state.isConnected && state.isInternetReachable);
+      const online = state.isConnected === true;
       const wasOffline = !isOnlineRef.current;
       
       setIsOnline(online);
