@@ -29,6 +29,8 @@ export default function CodeEntryScreen() {
   const [successMsg, setSuccessMsg] = useState('');
   const [isQueued, setIsQueued] = useState(false);
   const [attemptsCount, setAttemptsCount] = useState(0);
+  const [successCode, setSuccessCode] = useState('');
+  const [successTime, setSuccessTime] = useState('');
 
   const hiddenInputRef = useRef<TextInput | null>(null);
 
@@ -64,6 +66,8 @@ export default function CodeEntryScreen() {
 
       if (res.status === 'submitted') {
         const resData = res.data as any;
+        setSuccessCode(resData.session_code || code.trim().toUpperCase());
+        setSuccessTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         setSuccessMsg(resData.message || 'Checked in successfully!');
       } else if (res.status === 'queued') {
         setIsQueued(true);
@@ -124,6 +128,10 @@ export default function CodeEntryScreen() {
           <Ionicons name="checkmark-circle" size={80} color={Colors.Success} />
           <Text style={styles.successTitle}>Checked In Successfully</Text>
           <Text style={styles.noteText}>{successMsg}</Text>
+          <View style={styles.receiptContainer}>
+            <Text style={styles.receiptText}>Session Code: {successCode}</Text>
+            <Text style={styles.receiptText}>Time: {successTime}</Text>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -385,6 +393,22 @@ const styles = StyleSheet.create({
   doneBtnText: {
     ...Typography.Heading,
     color: Colors.White,
+    fontWeight: '600',
+  },
+  receiptContainer: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    width: '100%',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  receiptText: {
+    fontSize: 14,
+    color: Colors.Neutral800,
     fontWeight: '600',
   },
 });

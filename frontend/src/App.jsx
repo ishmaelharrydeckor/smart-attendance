@@ -42,7 +42,7 @@ import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const APK_VERSION = '1.0.0';
-const APK_DOWNLOAD_URL = 'https://expo.dev/artifacts/eas/turjwaGW1cqgG-8X_QoV9FltjjWUGbCddO3ewrg5eVg.apk';
+const APK_DOWNLOAD_URL = '/api/download-apk';
 const APK_SIZE_MB = '11.5';
 
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
@@ -179,6 +179,7 @@ export default function App() {
   };
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
+  const finalApkUrl = APK_DOWNLOAD_URL.startsWith('http') ? APK_DOWNLOAD_URL : (API_BASE ? `${API_BASE}${APK_DOWNLOAD_URL}`.replace(/([^:]\/)\/+/g, "$1") : `${window.location.origin}${APK_DOWNLOAD_URL}`);
 
   // Helper fetch wrapper to include token headers
   const apiFetch = async (endpoint, options = {}) => {
@@ -275,7 +276,7 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             <a
-              href={APK_DOWNLOAD_URL}
+              href={finalApkUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -877,7 +878,7 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setShowInstallInstruct
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
           <a
-            href={APK_DOWNLOAD_URL}
+            href={finalApkUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition w-full sm:w-auto"
@@ -889,7 +890,7 @@ function AuthScreen({ onAuthSuccess, showToast, apiFetch, setShowInstallInstruct
           {/* Desktop Only QR Code */}
           <div className="hidden sm:block border border-slate-200 dark:border-slate-800 p-2 rounded-xl bg-white">
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=96&data=${encodeURIComponent(APK_DOWNLOAD_URL)}`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=96&data=${encodeURIComponent(finalApkUrl)}`}
               alt="Scan to Download APK"
               className="w-24 h-24"
             />
@@ -2258,8 +2259,32 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                   <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 text-sm">
                     <td className="p-4">{new Date(s.date).toLocaleDateString()}</td>
                     <td className="p-4">
-                      <p className="font-semibold">{s.course_code}</p>
-                      <p className="text-[10px] text-slate-500">By: {s.creator_name || 'System'}</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">{s.course_code}</p>
+                      <p className="text-[10px] text-slate-500 mb-1">By: {s.creator_name || 'System'}</p>
+                      <select
+                        value={s.course_id}
+                        onChange={async (e) => {
+                          const targetCourseId = e.target.value;
+                          if (!confirm(`Are you sure you want to reassign this session to a different course?`)) return;
+                          try {
+                            await apiFetch(`/api/lecturer/sessions/${s.id}/reassign`, {
+                              method: 'PUT',
+                              body: JSON.stringify({ course_id: targetCourseId })
+                            });
+                            showToast('Session reassigned successfully', 'success');
+                            loadSessions();
+                          } catch (err) {
+                            showToast(err.message, 'error');
+                          }
+                        }}
+                        className="text-[10px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 text-slate-650 dark:text-slate-350 cursor-pointer max-w-[150px] outline-none"
+                      >
+                        {courses.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.code}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="p-4"><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{s.session_code}</code></td>
                     <td className="p-4">

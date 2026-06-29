@@ -260,7 +260,8 @@ router.post('/check-in/qr', checkInLimiter, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Checked in successfully for ${session.course_name} (${session.course_code})`
+      message: `Checked in successfully for ${session.course_name} (${session.course_code})`,
+      session_code: session.session_code
     });
   } catch (error) {
     console.error('Error during QR check-in:', error);
@@ -341,7 +342,8 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Checked in successfully for ${session.course_name} (${session.course_code})`
+      message: `Checked in successfully for ${session.course_name} (${session.course_code})`,
+      session_code: session.session_code
     });
   } catch (error) {
     console.error('Error during code check-in:', error);

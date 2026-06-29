@@ -28,6 +28,7 @@ export default function ScannerScreen() {
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [queuedState, setQueuedState] = useState<'checkin' | 'checkout' | null>(null);
+  const [successData, setSuccessData] = useState<{ message: string, sessionCode: string, timestamp: string } | null>(null);
 
   // Scanning animation values
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -180,7 +181,12 @@ export default function ScannerScreen() {
 
         if (res.status === 'submitted') {
           const resData = res.data as any;
-          Alert.alert('Success', resData.message || 'Checked in successfully!');
+          setSuccessData({
+            message: resData.message || 'Checked in successfully!',
+            sessionCode: resData.session_code || 'QR Code Scan',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          });
+          return;
         } else if (res.status === 'queued') {
           setQueuedState('checkin');
           return;
@@ -199,6 +205,29 @@ export default function ScannerScreen() {
       setLoading(false);
     }
   };
+
+  if (successData) {
+    return (
+      <View style={styles.queuedContainer}>
+        <View style={styles.queuedCard}>
+          <Ionicons name="checkmark-circle" size={80} color={Colors.Success} />
+          <Text style={styles.queuedTitle}>Checked In Successfully</Text>
+          <Text style={styles.queuedSubtext}>{successData.message}</Text>
+          <View style={styles.receiptContainer}>
+            <Text style={styles.receiptText}>Session Code: {successData.sessionCode}</Text>
+            <Text style={styles.receiptText}>Time: {successData.timestamp}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.queuedBtn}
+          onPress={() => router.replace('/')}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.queuedBtnText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (queuedState) {
     const isCheckin = queuedState === 'checkin';
@@ -503,5 +532,21 @@ const styles = StyleSheet.create({
     color: '#ffc107',
     fontWeight: '500',
     flex: 1,
+  },
+  receiptContainer: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    width: '100%',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  receiptText: {
+    fontSize: 14,
+    color: Colors.Neutral800,
+    fontWeight: '600',
   },
 });
