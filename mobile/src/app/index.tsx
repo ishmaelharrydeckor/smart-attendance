@@ -62,6 +62,13 @@ export default function DashboardScreen() {
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const { isOnline, queueLength, clearQueue } = useOfflineQueue(); // Get offline queue details for profile view
 
+  // Change Password States
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPasswordLoading, setChangingPasswordLoading] = useState(false);
+
   const handleLogoutConfirmation = () => {
     Alert.alert(
       'Logout',
@@ -71,6 +78,46 @@ export default function DashboardScreen() {
         { text: 'Log Out', style: 'destructive', onPress: logout }
       ]
     );
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Validation Error', 'All password fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation Error', 'New passwords do not match.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Validation Error', 'New password must be at least 6 characters.');
+      return;
+    }
+
+    setChangingPasswordLoading(true);
+    try {
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      Alert.alert('Success', 'Password changed successfully!');
+      
+      // Reset form states
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsChangingPassword(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to change password. Please check your current password.');
+    } finally {
+      setChangingPasswordLoading(false);
+    }
   };
   
   const [courses, setCourses] = useState<Course[]>([]);
@@ -1228,80 +1275,167 @@ export default function DashboardScreen() {
           <View style={styles.modalContent}>
             {/* Header / Close */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalHeaderTitle}>Account Profile</Text>
-              <TouchableOpacity onPress={() => setProfileMenuVisible(false)} style={styles.modalCloseButton}>
+              <Text style={styles.modalHeaderTitle}>
+                {isChangingPassword ? 'Change Password' : 'Account Profile'}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  setProfileMenuVisible(false);
+                  setIsChangingPassword(false);
+                }} 
+                style={styles.modalCloseButton}
+              >
                 <Ionicons name="close" size={24} color={Colors.Neutral600} />
               </TouchableOpacity>
             </View>
 
-            {/* Profile Info Card */}
-            <View style={styles.profileCard}>
-              <View style={styles.profileAvatarBig}>
-                <Text style={styles.profileAvatarTextBig}>{getInitials(user?.name)}</Text>
-              </View>
-              <Text style={styles.profileName}>{user?.name}</Text>
-              <Text style={styles.profileRole}>{user?.role?.toUpperCase()}</Text>
-              <Text style={styles.profileEmail}>{user?.email || user?.student_id || 'User account'}</Text>
-            </View>
-
-            {/* Offline Sync Status Section */}
-            <View style={styles.syncSection}>
-              <View style={styles.syncRow}>
-                <View style={styles.syncIconContainer}>
-                  <Ionicons 
-                    name={isOnline ? "cloud-done-outline" : "cloud-offline-outline"} 
-                    size={20} 
-                    color={isOnline ? "#059669" : "#D97706"} 
+            {isChangingPassword ? (
+              /* Change Password Form View */
+              <View style={styles.passwordForm}>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Current Password</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Enter current password"
+                    secureTextEntry={true}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
                   />
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.syncTitle}>Connection Status</Text>
-                  <Text style={styles.syncSubtitle}>
-                    {isOnline ? "Online — database connected" : "Offline mode — changes cached"}
-                  </Text>
-                </View>
-                <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#D1FAE5' : '#FEF3C7' }]}>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: isOnline ? '#065F46' : '#92400E' }}>
-                    {isOnline ? "ONLINE" : "OFFLINE"}
-                  </Text>
-                </View>
-              </View>
 
-              <View style={[styles.syncRow, { marginTop: 16 }]}>
-                <View style={styles.syncIconContainer}>
-                  <Ionicons name="sync-outline" size={20} color={Colors.Brand600} />
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>New Password</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Enter new password (min. 6 chars)"
+                    secureTextEntry={true}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                  />
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.syncTitle}>Offline Sync Queue</Text>
-                  <Text style={styles.syncSubtitle}>
-                    {queueLength} pending check-in requests
-                  </Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Confirm New Password</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Confirm new password"
+                    secureTextEntry={true}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                  />
                 </View>
-                {queueLength > 0 && (
-                  <TouchableOpacity 
+
+                <View style={styles.formActionsRow}>
+                  <TouchableOpacity
                     onPress={() => {
-                      Alert.alert(
-                        'Clear Queue',
-                        'Are you sure you want to clear your local offline check-in queue?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Clear', style: 'destructive', onPress: () => { clearQueue(); Alert.alert('Success', 'Offline queue cleared.'); } }
-                        ]
-                      );
+                      setIsChangingPassword(false);
+                      setCurrentPassword('');
+                      setNewPassword('');
+                      setConfirmPassword('');
                     }}
-                    style={styles.clearQueueBtn}
+                    style={styles.formCancelBtn}
+                    disabled={changingPasswordLoading}
                   >
-                    <Text style={styles.clearQueueBtnText}>Clear</Text>
+                    <Text style={styles.formCancelBtnText}>Cancel</Text>
                   </TouchableOpacity>
-                )}
+
+                  <TouchableOpacity
+                    onPress={handleChangePassword}
+                    style={styles.formSubmitBtn}
+                    disabled={changingPasswordLoading}
+                  >
+                    {changingPasswordLoading ? (
+                      <ActivityIndicator size="small" color={Colors.White} />
+                    ) : (
+                      <Text style={styles.formSubmitBtnText}>Update Password</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            ) : (
+              /* Profile Details & Sync View */
+              <>
+                {/* Profile Info Card */}
+                <View style={styles.profileCard}>
+                  <View style={styles.profileAvatarBig}>
+                    <Text style={styles.profileAvatarTextBig}>{getInitials(user?.name)}</Text>
+                  </View>
+                  <Text style={styles.profileName}>{user?.name}</Text>
+                  <Text style={styles.profileRole}>{user?.role?.toUpperCase()}</Text>
+                  <Text style={styles.profileEmail}>{user?.email || user?.student_id || 'User account'}</Text>
+                </View>
+
+                {/* Offline Sync Status Section */}
+                <View style={styles.syncSection}>
+                  <View style={styles.syncRow}>
+                    <View style={styles.syncIconContainer}>
+                      <Ionicons 
+                        name={isOnline ? "cloud-done-outline" : "cloud-offline-outline"} 
+                        size={20} 
+                        color={isOnline ? "#059669" : "#D97706"} 
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.syncTitle}>Connection Status</Text>
+                      <Text style={styles.syncSubtitle}>
+                        {isOnline ? "Online — database connected" : "Offline mode — changes cached"}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusIndicator, { backgroundColor: isOnline ? '#D1FAE5' : '#FEF3C7' }]}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: isOnline ? '#065F46' : '#92400E' }}>
+                        {isOnline ? "ONLINE" : "OFFLINE"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.syncRow, { marginTop: 16 }]}>
+                    <View style={styles.syncIconContainer}>
+                      <Ionicons name="sync-outline" size={20} color={Colors.Brand600} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.syncTitle}>Offline Sync Queue</Text>
+                      <Text style={styles.syncSubtitle}>
+                        {queueLength} pending check-in requests
+                      </Text>
+                    </View>
+                    {queueLength > 0 && (
+                      <TouchableOpacity 
+                        onPress={() => {
+                          Alert.alert(
+                            'Clear Queue',
+                            'Are you sure you want to clear your local offline check-in queue?',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Clear', style: 'destructive', onPress: () => { clearQueue(); Alert.alert('Success', 'Offline queue cleared.'); } }
+                            ]
+                          );
+                        }}
+                        style={styles.clearQueueBtn}
+                      >
+                        <Text style={styles.clearQueueBtnText}>Clear</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </>
+            )}
 
             {/* Valuable Actions */}
-            <View style={{ marginTop: 'auto', marginBottom: 12 }}>
+            <View style={{ marginTop: 'auto', gap: 10, marginBottom: 12 }}>
+              {!isChangingPassword && (
+                <TouchableOpacity
+                  onPress={() => setIsChangingPassword(true)}
+                  style={styles.changePasswordBtn}
+                >
+                  <Ionicons name="key-outline" size={20} color={Colors.Brand700} />
+                  <Text style={styles.changePasswordBtnText}>Change Password</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 onPress={() => {
                   setProfileMenuVisible(false);
+                  setIsChangingPassword(false);
                   handleLogoutConfirmation();
                 }}
                 style={styles.logoutButton}
@@ -2240,6 +2374,77 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  changePasswordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    backgroundColor: '#F1F5F9',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  changePasswordBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.Brand700,
+  },
+  passwordForm: {
+    gap: Spacing.sm,
+  },
+  formGroup: {
+    marginBottom: Spacing.xs,
+  },
+  formLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.Neutral700,
+    marginBottom: 4,
+  },
+  formInput: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: Colors.Neutral200,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    fontSize: 14,
+    color: Colors.Neutral800,
+    backgroundColor: '#F8FAFC',
+  },
+  formActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  formCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.Neutral300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.White,
+  },
+  formCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.Neutral600,
+  },
+  formSubmitBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.Primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formSubmitBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.White,
   },
   logoutButton: {
     flexDirection: 'row',
