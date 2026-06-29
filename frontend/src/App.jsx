@@ -1006,11 +1006,33 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     setSelectedCourseId(null);
   }, [selectedPeriodId]);
 
+  const stopAllPolling = () => {
+    if (qrPollInterval.current) {
+      clearInterval(qrPollInterval.current);
+      qrPollInterval.current = null;
+    }
+    if (sessionPollInterval.current) {
+      clearInterval(sessionPollInterval.current);
+      sessionPollInterval.current = null;
+    }
+  };
+
   useEffect(() => {
-    return () => {
-      if (qrPollInterval.current) clearInterval(qrPollInterval.current);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopAllPolling();
+      } else {
+        if (activeSession && activeSession.id && activeSession.is_active) {
+          pollQrStatus(activeSession.id);
+        }
+      }
     };
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stopAllPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [activeSession?.id, activeSession?.is_active]);
 
   useEffect(() => {
     if (activeTab === 'invites') {
@@ -1566,7 +1588,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
 
         if (status.status === 'EXPIRED') {
           showToast('Session checking window closed.', 'info');
-          clearInterval(qrPollInterval.current);
+          stopAllPolling();
           setActiveSession(null);
           setActiveTab('sessions');
           loadSessions();
@@ -1593,7 +1615,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
     };
 
     fetchStatus();
-    qrPollInterval.current = setInterval(fetchStatus, 3000);
+    qrPollInterval.current = setInterval(fetchStatus, 15000);
   };
 
   // Toggle present/absent state manually for a student in live list
@@ -2311,7 +2333,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                                   body: JSON.stringify({ is_active: false })
                                 });
                                 if (activeSession && activeSession.id === s.id) {
-                                  clearInterval(qrPollInterval.current);
+                                  stopAllPolling();
                                   setActiveSession({ ...activeSession, is_active: false, end_time: new Date().toISOString() });
                                 }
                                 loadSessions();
@@ -2442,7 +2464,7 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                             method: 'PUT',
                             body: JSON.stringify({ is_active: false })
                           });
-                          clearInterval(qrPollInterval.current);
+                          stopAllPolling();
                           setActiveSession({ ...activeSession, is_active: false, end_time: new Date().toISOString() });
                           showToast('Session ended');
                         } catch (e) {
