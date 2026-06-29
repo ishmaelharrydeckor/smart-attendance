@@ -41,9 +41,9 @@ import {
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
-const APK_VERSION = '1.0.0';
+const APK_VERSION = '1.1.0';
 const APK_DOWNLOAD_URL = '/api/download-apk';
-const APK_SIZE_MB = '11.5';
+const APK_SIZE_MB = '109.5';
 
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
 const DEFAULT_SETTINGS = {
