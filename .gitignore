@@ -26,3 +26,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Custom APKs
+*.apk
