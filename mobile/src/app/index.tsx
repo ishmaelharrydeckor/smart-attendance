@@ -796,9 +796,8 @@ export default function DashboardScreen() {
 
                     {!isOnline && (
                       <View style={styles.offlineWarningBanner}>
-                        <Ionicons name="warning" size={16} color="#ffc107" />
                         <Text style={styles.offlineWarningText}>
-                          You're offline — QR check-in may not work if you reconnect after 1 minute. Use 'Enter code instead' for reliable offline check-in.
+                          ⚠ You're offline — use the session code for reliable check-in
                         </Text>
                       </View>
                     )}
@@ -833,7 +832,7 @@ export default function DashboardScreen() {
                           activeOpacity={0.75}
                         >
                           <Ionicons name="keypad-outline" size={20} color={Colors.Primary} />
-                          <Text style={styles.primaryCheckinBtnText}>Enter Code Instead</Text>
+                          <Text style={styles.primaryCheckinBtnText}>Enter Session Code</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -842,7 +841,7 @@ export default function DashboardScreen() {
                           disabled={windowClosed}
                           activeOpacity={0.75}
                         >
-                          <Text style={styles.secondaryCheckinLinkText}>Scan QR Code instead →</Text>
+                          <Text style={styles.secondaryCheckinLinkText}>Scan QR instead →</Text>
                         </TouchableOpacity>
                       </>
                     )}
