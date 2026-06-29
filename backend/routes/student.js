@@ -159,6 +159,7 @@ router.get('/history', async (req, res) => {
        ORDER BY ar.timestamp DESC`,
       [req.user.id]
     );
+    res.set('Cache-Control', 'no-store');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching student history:', error);

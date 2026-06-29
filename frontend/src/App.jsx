@@ -2285,10 +2285,9 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
                                   method: 'PUT',
                                   body: JSON.stringify({ is_active: false })
                                 });
-                                showToast('Session ended');
                                 if (activeSession && activeSession.id === s.id) {
                                   clearInterval(qrPollInterval.current);
-                                  setActiveSession(null);
+                                  setActiveSession({ ...activeSession, is_active: false, end_time: new Date().toISOString() });
                                 }
                                 loadSessions();
                               } catch (err) {
@@ -2314,123 +2313,146 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
       {activeTab === 'live-session' && activeSession && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="premium-card p-6 flex flex-col items-center justify-center text-center">
-            
-            {/* Sub-tab selection */}
-            <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 w-full">
-              <button
-                onClick={() => setLiveSessionSubMode('checkin')}
-                className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
-                  liveSessionSubMode === 'checkin' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
-                }`}
-              >
-                Check-in
-              </button>
-              <button
-                onClick={() => setLiveSessionSubMode('checkout')}
-                className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
-                  liveSessionSubMode === 'checkout' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
-                }`}
-              >
-                Check-out
-              </button>
-            </div>
-
-            {liveSessionSubMode === 'checkin' ? (
+            {activeSession.is_active ? (
               <>
-                <h3 className="text-xl font-bold mb-2">Check-in QR Code</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Rotates every {qrRotationTime} min to prevent sharing</p>
+                {/* Sub-tab selection */}
+                <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 w-full">
+                  <button
+                    onClick={() => setLiveSessionSubMode('checkin')}
+                    className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
+                      liveSessionSubMode === 'checkin' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
+                    }`}
+                  >
+                    Check-in
+                  </button>
+                  <button
+                    onClick={() => setLiveSessionSubMode('checkout')}
+                    className={`flex-1 pb-3 text-xs uppercase font-bold border-b-2 transition ${
+                      liveSessionSubMode === 'checkout' ? 'border-brand-600 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-400'
+                    }`}
+                  >
+                    Check-out
+                  </button>
+                </div>
 
-                {qrCodeUrl ? (
-                  <img src={qrCodeUrl} alt="Session QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
+                {liveSessionSubMode === 'checkin' ? (
+                  <>
+                    <h3 className="text-xl font-bold mb-2">Check-in QR Code</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Rotates every {qrRotationTime} min to prevent sharing</p>
+
+                    {qrCodeUrl ? (
+                      <img src={qrCodeUrl} alt="Session QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
+                    ) : (
+                      <div className="w-64 h-64 border flex items-center justify-center mb-4">Loading QR Code...</div>
+                    )}
+
+                    <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
+                      <div>
+                        <p className="text-slate-500 text-xs">Self Check-in Code</p>
+                        <p className="font-bold text-lg text-brand-600">{activeSession.session_code}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-slate-500 text-xs">Time Remaining</p>
+                        <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
+                      </div>
+                    </div>
+                  </>
                 ) : (
-                  <div className="w-64 h-64 border flex items-center justify-center mb-4">Loading QR Code...</div>
+                  !activeSession.checkout_qr_token ? (
+                    <div className="py-6 px-4 flex flex-col items-center justify-center text-center">
+                      <AlertCircle className="w-12 h-12 text-indigo-500 mb-3 animate-pulse" />
+                      <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Check-out is Inactive</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5 leading-normal">
+                        Students cannot check out yet. Activate to generate checkout QR code and session code.
+                      </p>
+                      <button
+                        onClick={activateCheckout}
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-lg w-full"
+                      >
+                        Activate Check-out Mode
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-xl font-bold mb-2">Check-out QR Code</h3>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Scan to record checkout timestamp</p>
+
+                      {checkoutQrCodeUrl ? (
+                        <img src={checkoutQrCodeUrl} alt="Checkout QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
+                      ) : (
+                        <div className="w-64 h-64 border flex items-center justify-center mb-4">Generating QR...</div>
+                      )}
+
+                      <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
+                        <div>
+                          <p className="text-slate-500 text-xs">Checkout Code</p>
+                          <p className="font-bold text-lg text-indigo-650">{activeSession.checkout_session_code}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-slate-500 text-xs">Time Remaining</p>
+                          <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
+                        </div>
+                      </div>
+                    </>
+                  )
                 )}
 
-                <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
-                  <div>
-                    <p className="text-slate-500 text-xs">Self Check-in Code</p>
-                    <p className="font-bold text-lg text-brand-600">{activeSession.session_code}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-slate-500 text-xs">Time Remaining</p>
-                    <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
+                <div className="flex flex-col gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
+                  <button
+                    onClick={startLecturerCameraScan}
+                    className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Scan Student Cards
+                  </button>
+                  <div className="flex gap-2">
+                    <label className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-3.5 rounded-xl transition cursor-pointer text-center text-sm">
+                      <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+                      Upload CSV Checkin
+                    </label>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiFetch(`/api/lecturer/sessions/${activeSession.id}/toggle`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ is_active: false })
+                          });
+                          clearInterval(qrPollInterval.current);
+                          setActiveSession({ ...activeSession, is_active: false, end_time: new Date().toISOString() });
+                          showToast('Session ended');
+                        } catch (e) {
+                          showToast(e.message, 'error');
+                        }
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 rounded-xl text-sm"
+                    >
+                      Close Session
+                    </button>
                   </div>
                 </div>
               </>
             ) : (
-              !activeSession.checkout_qr_token ? (
-                <div className="py-6 px-4 flex flex-col items-center justify-center text-center">
-                  <AlertCircle className="w-12 h-12 text-indigo-500 mb-3 animate-pulse" />
-                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Check-out is Inactive</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5 leading-normal">
-                    Students cannot check out yet. Activate to generate checkout QR code and session code.
-                  </p>
-                  <button
-                    onClick={activateCheckout}
-                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-lg w-full"
-                  >
-                    Activate Check-out Mode
-                  </button>
+              /* Session Ended Card */
+              <div className="w-full py-8 text-slate-400 dark:text-slate-500">
+                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4 text-slate-500">
+                  <Calendar className="w-8 h-8" />
                 </div>
-              ) : (
-                <>
-                  <h3 className="text-xl font-bold mb-2">Check-out QR Code</h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Scan to record checkout timestamp</p>
-
-                  {checkoutQrCodeUrl ? (
-                    <img src={checkoutQrCodeUrl} alt="Checkout QR Code" className="w-64 h-64 border border-slate-100 dark:border-slate-800 rounded-xl mb-4 bg-white" />
-                  ) : (
-                    <div className="w-64 h-64 border flex items-center justify-center mb-4">Generating QR...</div>
-                  )}
-
-                  <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between text-left text-sm mb-4">
-                    <div>
-                      <p className="text-slate-500 text-xs">Checkout Code</p>
-                      <p className="font-bold text-lg text-indigo-650">{activeSession.checkout_session_code}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-slate-500 text-xs">Time Remaining</p>
-                      <p className="font-bold text-lg">{Math.floor(secondsRemaining / 60)}m {secondsRemaining % 60}s</p>
-                    </div>
+                <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Session Ended</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto mb-6">This checking session has been closed early by the lecturer.</p>
+                <div className="w-full border-t border-slate-150 dark:border-slate-800 pt-4 text-left text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 text-xs font-semibold">Session Code</span>
+                    <span className="font-bold text-slate-600 dark:text-slate-400">{activeSession.session_code}</span>
                   </div>
-                </>
-              )
-            )}
-
-            <div className="flex flex-col gap-2 w-full border-t border-slate-100 dark:border-slate-800 pt-4">
-              <button
-                onClick={startLecturerCameraScan}
-                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md"
-              >
-                <Camera className="w-4 h-4" />
-                Scan Student Cards
-              </button>
-              <div className="flex gap-2">
-                <label className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-3.5 rounded-xl transition cursor-pointer text-center text-sm">
-                  <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-                  Upload CSV Checkin
-                </label>
-                <button
-                  onClick={async () => {
-                    try {
-                      await apiFetch(`/api/lecturer/sessions/${activeSession.id}/toggle`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ is_active: false })
-                      });
-                      clearInterval(qrPollInterval.current);
-                      setActiveSession(null);
-                      showToast('Session ended');
-                      setActiveTab('sessions');
-                    } catch (e) {
-                      showToast(e.message, 'error');
-                    }
-                  }}
-                  className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 rounded-xl text-sm"
-                >
-                  Close Session
-                </button>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 text-xs font-semibold">End Time</span>
+                    <span className="font-bold text-slate-600 dark:text-slate-400">
+                      {new Date(activeSession.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="md:col-span-2 premium-card p-6">
@@ -3588,6 +3610,10 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
 
   useEffect(() => {
     loadStudentData();
+    window.addEventListener('focus', loadStudentData);
+    return () => {
+      window.removeEventListener('focus', loadStudentData);
+    };
   }, []);
 
   const loadStudentData = async () => {

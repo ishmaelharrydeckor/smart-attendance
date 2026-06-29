@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,9 +12,10 @@ import {
   Animated,
   StatusBar,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -134,6 +135,7 @@ export default function DashboardScreen() {
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [windowClosed, setWindowClosed] = useState(false);
   const intervalRef = useRef<any | null>(null);
+  const staffScrollViewRef = useRef<ScrollView | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Student manual code entry states
@@ -147,6 +149,7 @@ export default function DashboardScreen() {
   const [showCheckoutQr, setShowCheckoutQr] = useState(false);
   
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // --- LECTURER TABBED CONSOLE CONTROLS ---
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'live' | 'reports' | 'invites' | 'settings'>('dashboard');
@@ -206,6 +209,78 @@ export default function DashboardScreen() {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchStudentActiveSession();
+      await loadStudentHistory();
+    } catch (e) {
+      console.warn('Refresh error:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  const loadStudentHistory = async () => {
+    try {
+      const historyData = await apiFetch('/api/student/history');
+      setHistory(historyData);
+      const active = historyData.find((h: any) => !h.checkout_time);
+      if (active) {
+        setActiveCheckin(active);
+      } else {
+        setActiveCheckin(null);
+      }
+    } catch (e: any) {
+      console.warn('Failed to load student history:', e.message);
+    }
+  };
+
+  const fetchStudentActiveSession = async () => {
+    try {
+      const sessionData = await apiFetch('/api/student/active-session');
+      setActiveSession(sessionData);
+      return sessionData;
+    } catch (e: any) {
+      console.warn('Failed to fetch student active session:', e.message);
+      return null;
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isStaff) {
+        fetchStudentActiveSession();
+        loadStudentHistory();
+      }
+    }, [isStaff])
+  );
+
+  // Poll active session for students (every 30 seconds)
+  useEffect(() => {
+    let intervalId: any;
+    if (!isStaff) {
+      const pollActiveSession = async () => {
+        try {
+          const sessionData = await apiFetch('/api/student/active-session');
+          
+          // Re-fetch history if active session closes
+          if (activeSession && !sessionData) {
+            loadStudentHistory();
+          }
+          
+          setActiveSession(sessionData);
+        } catch (e: any) {
+          console.warn('Poll active session error:', e.message);
+        }
+      };
+      intervalId = setInterval(pollActiveSession, 30000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isStaff, activeSession]);
+
   const loadCoursesOnMount = async () => {
     setLoading(true);
     try {
@@ -219,17 +294,8 @@ export default function DashboardScreen() {
         const courseData = await apiFetch('/api/student/courses');
         setCourses(courseData);
 
-        const historyData = await apiFetch('/api/student/history');
-        setHistory(historyData);
-
-        const active = historyData.find((h: any) => !h.checkout_time);
-        if (active) {
-          setActiveCheckin(active);
-        }
-
-        // Fetch active session for student
-        const sessionData = await apiFetch('/api/student/active-session');
-        setActiveSession(sessionData);
+        await loadStudentHistory();
+        await fetchStudentActiveSession();
       }
     } catch (err: any) {
       console.warn('Dashboard mount fetch error:', err.message);
@@ -417,6 +483,12 @@ export default function DashboardScreen() {
           setCheckoutQrToken(active.checkout_qr_token);
           setCheckoutCode(active.checkout_session_code);
         }
+      } else {
+        setActiveSession(null);
+        setCheckoutEnabled(false);
+        setCheckoutQrToken(null);
+        setCheckoutCode(null);
+        setShowCheckoutQr(false);
       }
     } catch (err: any) {
       console.warn('Fetch sessions error:', err.message);
@@ -481,7 +553,12 @@ export default function DashboardScreen() {
       setCheckoutQrToken(null);
       setCheckoutCode(null);
       setShowCheckoutQr(false);
-      Alert.alert('Success', 'Session closed successfully!');
+      
+      Alert.alert('Session Closed', 'The session has been ended successfully.');
+      
+      // Scroll back to top immediately
+      staffScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+
       if (selectedCourse) {
         loadLecturerSessionsForCourse(selectedCourse.id);
       }
@@ -637,6 +714,9 @@ export default function DashboardScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           {activeSession ? (
             // Active Session Card
@@ -859,6 +939,7 @@ export default function DashboardScreen() {
         // LECTURER / TA PORTAL VIEW
         <View style={styles.staffContainer}>
           <ScrollView
+            ref={staffScrollViewRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContentStaff}
             showsVerticalScrollIndicator={false}
