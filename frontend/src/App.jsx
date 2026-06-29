@@ -3878,9 +3878,10 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
             <button
               onClick={() => startCameraScan(false)}
               disabled={checkingIn}
-              className="flex-1 bg-white hover:bg-slate-100 text-brand-600 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+              className="flex-1 bg-white hover:bg-slate-100 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+              style={{ color: '#2563eb' }}
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-4 h-4" style={{ color: '#2563eb' }} />
               Scan QR Code
             </button>
             <button
@@ -3905,9 +3906,10 @@ function StudentConsole({ user, settings, showToast, apiFetch, queueOfflineReque
               <button
                 onClick={() => startCameraScan(true)}
                 disabled={checkingIn}
-                className="flex-1 bg-white hover:bg-slate-105 text-indigo-850 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+                className="flex-1 bg-white hover:bg-slate-105 font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg text-sm"
+                style={{ color: '#312e81' }}
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-4 h-4" style={{ color: '#312e81' }} />
                 Scan Checkout QR
               </button>
               <button
