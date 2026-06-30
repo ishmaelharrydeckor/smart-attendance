@@ -45,6 +45,9 @@ const APK_VERSION = '1.1.0';
 const APK_DOWNLOAD_URL = '/api/download-apk';
 const APK_SIZE_MB = '109.5';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+const finalApkUrl = APK_DOWNLOAD_URL.startsWith('http') ? APK_DOWNLOAD_URL : (API_BASE ? `${API_BASE}${APK_DOWNLOAD_URL}`.replace(/([^:]\/)\/+/g, "$1") : `${window.location.origin}${APK_DOWNLOAD_URL}`);
+
 // Mock/Default configurations (Stored in LocalStorage to preserve settings)
 const DEFAULT_SETTINGS = {
   minThreshold: 75,
@@ -178,8 +181,7 @@ export default function App() {
     }
   };
 
-  const API_BASE = import.meta.env.VITE_API_URL || '';
-  const finalApkUrl = APK_DOWNLOAD_URL.startsWith('http') ? APK_DOWNLOAD_URL : (API_BASE ? `${API_BASE}${APK_DOWNLOAD_URL}`.replace(/([^:]\/)\/+/g, "$1") : `${window.location.origin}${APK_DOWNLOAD_URL}`);
+
 
   // Helper fetch wrapper to include token headers
   const apiFetch = async (endpoint, options = {}) => {

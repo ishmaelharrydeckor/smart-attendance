@@ -5,10 +5,10 @@ require('dotenv').config();
 async function uploadApk() {
   try {
     const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-    const r2AccountId = process.env.R2_ACCOUNT_ID;
-    const r2AccessKey = process.env.R2_ACCESS_KEY_ID;
-    const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY;
-    const r2Bucket = process.env.R2_BUCKET_NAME;
+    const r2AccountId = process.env.R2_ACCOUNT_ID ? process.env.R2_ACCOUNT_ID.trim() : '';
+    const r2AccessKey = process.env.R2_ACCESS_KEY_ID ? process.env.R2_ACCESS_KEY_ID.trim() : '';
+    const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY ? process.env.R2_SECRET_ACCESS_KEY.trim() : '';
+    const r2Bucket = process.env.R2_BUCKET_NAME ? process.env.R2_BUCKET_NAME.trim() : '';
 
     if (!r2AccountId || !r2AccessKey || !r2SecretKey || !r2Bucket) {
       console.error("Missing R2 environment variables (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME). Cannot upload APK.");
