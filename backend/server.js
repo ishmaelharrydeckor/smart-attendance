@@ -43,14 +43,18 @@ app.get('/api/download-apk', async (req, res) => {
   const path = require('path');
   const fs = require('fs');
 
-  const serveLocalFallback = () => {
+  const serveLocalFallback = (missingVars = []) => {
     const localApkPath = path.join(__dirname, '../smartroll-preview.apk');
     if (fs.existsSync(localApkPath)) {
       res.setHeader('Content-Type', 'application/vnd.android.package-archive');
       res.setHeader('Content-Disposition', 'attachment; filename="smartroll.apk"');
       return fs.createReadStream(localApkPath).pipe(res);
     }
-    return res.status(503).json({ error: 'APK temporarily unavailable. Please try again later.' });
+    return res.status(503).json({
+      error: 'APK temporarily unavailable. Please try again later.',
+      missing_vars: missingVars,
+      r2_env_keys: Object.keys(process.env).filter(k => k.startsWith('R2_'))
+    });
   };
 
   try {
@@ -60,9 +64,15 @@ app.get('/api/download-apk', async (req, res) => {
     const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY ? process.env.R2_SECRET_ACCESS_KEY.trim() : '';
     const r2Bucket = process.env.R2_BUCKET_NAME ? process.env.R2_BUCKET_NAME.trim() : '';
 
-    if (!r2AccountId || !r2AccessKey || !r2SecretKey || !r2Bucket) {
-      console.log('R2 env vars not configured, serving local backup APK...');
-      return serveLocalFallback();
+    const missing = [];
+    if (!r2AccountId) missing.push('R2_ACCOUNT_ID');
+    if (!r2AccessKey) missing.push('R2_ACCESS_KEY_ID');
+    if (!r2SecretKey) missing.push('R2_SECRET_ACCESS_KEY');
+    if (!r2Bucket) missing.push('R2_BUCKET_NAME');
+
+    if (missing.length > 0) {
+      console.log('R2 env vars not configured:', missing);
+      return serveLocalFallback(missing);
     }
 
     const s3Client = new S3Client({
