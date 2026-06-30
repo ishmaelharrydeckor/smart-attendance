@@ -111,7 +111,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (user && user.role === 'lecturer') {
+    if (user && (user.role === 'lecturer' || user.role === 'ta')) {
       apiFetch('/api/auth/academic-periods')
         .then(periods => {
           setAcademicPeriods(periods);
