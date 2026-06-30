@@ -133,7 +133,7 @@ export default function AuthScreen() {
         password,
         student_id: studentId,
         level,
-        selectedCourses,
+        course_ids: selectedCourses,
       });
       Alert.alert('Success', 'Registered successfully!');
     } catch (err: any) {

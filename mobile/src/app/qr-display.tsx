@@ -57,58 +57,52 @@ export default function QrDisplayScreen() {
     };
   }, [originalBrightness]);
 
-  const fetchActiveSession = async () => {
-    try {
-      const sessions = await apiFetch(`/api/lecturer/sessions?course_id=${courseId}`);
-      const active = sessions.find((s: any) => s.is_active);
-      if (active) {
-        setActiveSession(active);
-        
-        // Fetch checked in count
-        const list = await apiFetch(`/api/lecturer/sessions/${active.id}/live-attendance`);
-        const presentCount = (list.records || []).filter((r: any) => r.is_present).length;
-        setCheckedInCount(presentCount);
+  const sessionId = Number(params.sessionId);
 
-        const intervalMins = active.qr_rotation_interval_minutes || 2;
-        setTimeLeft(intervalMins * 60);
-      } else {
-        Alert.alert('Session Inactive', 'This session has been deactivated.', [
+  const fetchSessionStatus = async () => {
+    try {
+      if (!sessionId) return;
+      const status = await apiFetch(`/api/sessions/${sessionId}/qr-status`);
+      if (status.status === 'EXPIRED' || !status.is_active) {
+        Alert.alert('Session Ended', 'This session has been deactivated or expired.', [
           { text: 'OK', onPress: () => router.back() }
         ]);
+        return;
       }
+      setActiveSession(status);
+      setCheckedInCount(status.present_count ? Number(status.present_count) : 0);
+      setTimeLeft(status.qr_seconds_remaining !== undefined ? status.qr_seconds_remaining : 60);
     } catch (e: any) {
-      console.warn('Error fetching active session for QR display:', e.message);
+      console.warn('Error fetching session QR status:', e.message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchActiveSession();
-  }, [courseId]);
+    if (!sessionId) {
+      Alert.alert('Error', 'Invalid session identifier.', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+      return;
+    }
+    fetchSessionStatus();
+    const statusInterval = setInterval(fetchSessionStatus, 15000);
+    return () => clearInterval(statusInterval);
+  }, [sessionId]);
 
-  // Handle countdown timer & rotation triggers
+  // Local second-by-second countdown decrementer
   useEffect(() => {
-    if (!activeSession) return;
-    const intervalMins = activeSession.qr_rotation_interval_minutes || 2;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          fetchActiveSession(); // rotate
-          return intervalMins * 60;
-        }
-        return prev - 1;
-      });
+    const countdownTimer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
-
-    return () => clearInterval(timer);
-  }, [activeSession]);
+    return () => clearInterval(countdownTimer);
+  }, []);
 
   // Sync Animated value with timeLeft
   useEffect(() => {
     if (!activeSession) return;
-    const totalSecs = (activeSession.qr_rotation_interval_minutes || 2) * 60;
+    const totalSecs = (activeSession.qr_rotation_interval_mins || 1) * 60;
     Animated.timing(progressWidth, {
       toValue: timeLeft / totalSecs,
       duration: 1000,

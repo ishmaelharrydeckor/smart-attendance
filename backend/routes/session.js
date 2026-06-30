@@ -8,7 +8,8 @@ const { authenticateToken, requireLecturerOrTA, requireCourseAccess } = require(
 router.get('/:id/qr-status', authenticateToken, requireLecturerOrTA, requireCourseAccess, async (req, res) => {
   try {
     const sessionResult = await db.query(
-      `SELECT s.*, c.name as course_name, c.code as course_code
+      `SELECT s.*, c.name as course_name, c.code as course_code,
+              (SELECT COUNT(*) FROM attendance_records WHERE session_id = s.id AND is_present = true) as present_count
        FROM sessions s
        JOIN courses c ON s.course_id = c.id
        WHERE s.id = $1`,

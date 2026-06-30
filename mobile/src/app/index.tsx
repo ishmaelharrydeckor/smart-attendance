@@ -1045,6 +1045,7 @@ export default function DashboardScreen() {
                               params: {
                                 courseId: selectedCourse.id,
                                 courseCode: selectedCourse.code,
+                                sessionId: activeSession.id,
                               }
                             })}
                             activeOpacity={0.75}
