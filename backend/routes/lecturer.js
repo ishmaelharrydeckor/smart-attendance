@@ -260,33 +260,34 @@ router.delete('/courses/:id', requireRole('lecturer'), async (req, res) => {
 
 // 4. Session Operations
 router.post('/sessions', requireLecturerOrTA, requireCourseAccess, async (req, res) => {
-  const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng, allowed_radius_meters, late_grace_period_minutes } = req.body;
-  if (!course_id) return res.status(400).json({ error: 'Course ID is required.' });
+    const { course_id, duration_mins, qr_rotation_mins, location_name, gps_lat, gps_lng, allowed_radius_meters, late_grace_period_minutes, gps_enabled } = req.body;
+    if (!course_id) return res.status(400).json({ error: 'Course ID is required.' });
 
-  try {
-    const courseRes = await db.query('SELECT academic_period_id FROM courses WHERE id = $1', [course_id]);
-    if (courseRes.rows.length === 0) return res.status(404).json({ error: 'Course not found.' });
-    const academicPeriodId = courseRes.rows[0].academic_period_id;
+    try {
+      const courseRes = await db.query('SELECT academic_period_id FROM courses WHERE id = $1', [course_id]);
+      if (courseRes.rows.length === 0) return res.status(404).json({ error: 'Course not found.' });
+      const academicPeriodId = courseRes.rows[0].academic_period_id;
 
-    // Generate unique session code
-    const sessionCode = 'ATT-' + Math.floor(1000 + Math.random() * 9000);
-    // Generate signed/unique token for initial QR
-    const qrToken = crypto.randomBytes(32).toString('hex');
+      // Generate unique session code
+      const sessionCode = 'ATT-' + Math.floor(1000 + Math.random() * 9000);
+      // Generate signed/unique token for initial QR
+      const qrToken = crypto.randomBytes(32).toString('hex');
 
-    const duration = duration_mins || 10;
-    const rotation = qr_rotation_mins || 1;
-    const radius = allowed_radius_meters || 200;
-    const gracePeriod = late_grace_period_minutes || 10;
+      const duration = duration_mins || 10;
+      const rotation = qr_rotation_mins || 1;
+      const radius = allowed_radius_meters || 200;
+      const gracePeriod = late_grace_period_minutes || 10;
+      const gpsEnabled = gps_enabled !== undefined ? !!gps_enabled : true;
 
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
-    const qrExpiresAt = new Date(startTime.getTime() + rotation * 60 * 1000);
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
+      const qrExpiresAt = new Date(startTime.getTime() + rotation * 60 * 1000);
 
-    const result = await db.query(
-      `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng, allowed_radius_meters, academic_period_id, late_grace_period_minutes)
-       VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null, radius, academicPeriodId, gracePeriod]
-    );
+      const result = await db.query(
+        `INSERT INTO sessions (course_id, start_time, end_time, qr_token, session_code, is_active, qr_expires_at, qr_rotation_interval_mins, created_by, location_name, gps_lat, gps_lng, allowed_radius_meters, academic_period_id, late_grace_period_minutes, gps_enabled)
+         VALUES ($1, $2, $3, $4, $5, true, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+        [course_id, startTime, endTime, qrToken, sessionCode, qrExpiresAt, rotation, req.user.id, location_name || null, gps_lat || null, gps_lng || null, radius, academicPeriodId, gracePeriod, gpsEnabled]
+      );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {

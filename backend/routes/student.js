@@ -74,7 +74,7 @@ router.post('/check-in/fallback', checkInLimiter, async (req, res) => {
     }
 
     // 4. Optional GPS Verification
-    if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
+    if (process.env.GPS_VERIFICATION_ENABLED === 'true' && session.gps_enabled !== false) {
       const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
       const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
       const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
@@ -224,7 +224,7 @@ router.post('/check-in/qr', checkInLimiter, async (req, res) => {
     }
 
     // 3. Optional GPS Verification
-    if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
+    if (process.env.GPS_VERIFICATION_ENABLED === 'true' && session.gps_enabled !== false) {
       const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
       const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
       const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');
@@ -306,7 +306,7 @@ router.post('/check-in/code', checkInLimiter, async (req, res) => {
     }
 
     // Optional GPS Verification
-    if (process.env.GPS_VERIFICATION_ENABLED === 'true') {
+    if (process.env.GPS_VERIFICATION_ENABLED === 'true' && session.gps_enabled !== false) {
       const targetLat = session.gps_lat ? parseFloat(session.gps_lat) : parseFloat(process.env.CAMPUS_LAT || '5.6037');
       const targetLng = session.gps_lng ? parseFloat(session.gps_lng) : parseFloat(process.env.CAMPUS_LNG || '-0.1870');
       const allowedRadius = session.allowed_radius_meters ? parseFloat(session.allowed_radius_meters) : parseFloat(process.env.ALLOWED_RADIUS_METERS || '200');

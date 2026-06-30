@@ -1566,7 +1566,8 @@ function LecturerConsole({ user, activeTab, setActiveTab, settings, setSettings,
           gps_lat: lat,
           gps_lng: lng,
           allowed_radius_meters: sessionRadius || 200,
-          late_grace_period_minutes: lateGracePeriod || 10
+          late_grace_period_minutes: lateGracePeriod || 10,
+          gps_enabled: settings.gpsEnabled
         })
       });
       setActiveSession(session);
