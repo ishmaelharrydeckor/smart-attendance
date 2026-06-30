@@ -92,7 +92,11 @@ app.get('/api/download-apk', async (req, res) => {
     s3Response.Body.pipe(res);
   } catch (error) {
     console.error('R2 unavailable, falling back to local copy:', error.message);
-    return serveLocalFallback();
+    return res.status(503).json({
+      error: 'APK temporarily unavailable. Please try again later.',
+      debug_message: error.message,
+      debug_stack: error.stack
+    });
   }
 });
 
