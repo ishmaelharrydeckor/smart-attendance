@@ -199,11 +199,28 @@ export function useOfflineQueue() {
     await saveQueue(remainingQueue);
   };
 
+  const clearStaleQueueItems = async (newSessionId: number) => {
+    try {
+      const raw = await AsyncStorage.getItem(QUEUE_KEY);
+      if (!raw) return;
+      const queue: QueuedRequest[] = JSON.parse(raw);
+      const filtered = queue.filter(item => {
+        const payload = item.payload as any;
+        return Number(payload.session_id) === Number(newSessionId) || !payload.session_id;
+      });
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(filtered));
+      setQueueLength(filtered.length);
+    } catch (e) {
+      console.warn('Failed to clear stale queue items:', e);
+    }
+  };
+
   return {
     isOnline,
     queueLength,
     enqueue,
     flushQueue,
     clearQueue,
+    clearStaleQueueItems,
   };
 }

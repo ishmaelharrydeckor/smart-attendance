@@ -29,10 +29,12 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(false);
   const [queuedState, setQueuedState] = useState<'checkin' | 'checkout' | null>(null);
   const [successData, setSuccessData] = useState<{ message: string, sessionCode: string, timestamp: string } | null>(null);
+  const [scanEnabled, setScanEnabled] = useState(false);
 
-  // Scanning animation values
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
-  const pulseOpacity = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    const timer = setTimeout(() => setScanEnabled(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -99,6 +101,7 @@ export default function ScannerScreen() {
   }
 
   const handleBarcodeScanned = async ({ data }: { data: string }) => {
+    if (!scanEnabled) return;
     if (scanned || loading) return;
     setScanned(true);
     setLoading(true);

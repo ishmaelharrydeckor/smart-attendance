@@ -61,7 +61,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
-  const { isOnline, queueLength, clearQueue } = useOfflineQueue(); // Get offline queue details for profile view
+  const { isOnline, queueLength, clearQueue, clearStaleQueueItems } = useOfflineQueue(); // Get offline queue details for profile view
 
   // Change Password States
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -221,6 +221,22 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  const updateActiveSession = (newSession: any) => {
+    if (newSession?.id !== activeSession?.id) {
+      setActiveCheckin(null);
+      setSecondsRemaining(null);
+      setWindowClosed(false);
+      setCheckoutEnabled(false);
+      setCheckoutQrToken(null);
+      setCheckoutCode(null);
+      setShowCheckoutQr(false);
+      if (newSession?.id) {
+        clearStaleQueueItems(Number(newSession.id));
+      }
+    }
+    setActiveSession(newSession);
+  };
+
   const loadStudentHistory = async () => {
     try {
       const historyData = await apiFetch('/api/student/history');
@@ -238,8 +254,8 @@ export default function DashboardScreen() {
 
   const fetchStudentActiveSession = async () => {
     try {
-      const sessionData = await apiFetch('/api/student/active-session');
-      setActiveSession(sessionData);
+      const sessionData = await apiFetch(`/api/student/active-session?t=${Date.now()}`);
+      updateActiveSession(sessionData);
       return sessionData;
     } catch (e: any) {
       console.warn('Failed to fetch student active session:', e.message);
@@ -263,14 +279,14 @@ export default function DashboardScreen() {
     if (!isStaff) {
       const pollActiveSession = async () => {
         try {
-          const sessionData = await apiFetch('/api/student/active-session');
+          const sessionData = await apiFetch(`/api/student/active-session?t=${Date.now()}`);
           
           // Re-fetch history if active session closes
           if (activeSession && !sessionData) {
             loadStudentHistory();
           }
           
-          setActiveSession(sessionData);
+          updateActiveSession(sessionData);
         } catch (e: any) {
           console.warn('Poll active session error:', e.message);
         }
