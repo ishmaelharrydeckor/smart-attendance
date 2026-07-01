@@ -92,9 +92,9 @@ export default function CodeEntryScreen() {
   };
 
   const handleTextChange = (text: string) => {
-    const sanitized = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const sanitized = text.toUpperCase().replace(/[^A-Z0-9-]/g, '');
     setCodeValue(sanitized);
-    if (sanitized.length === 6) {
+    if (sanitized.length === 8) {
       handleSubmitCode(sanitized);
     }
   };
@@ -177,7 +177,7 @@ export default function CodeEntryScreen() {
                 activeOpacity={1}
                 onPress={() => hiddenInputRef.current?.focus()}
               >
-                {Array.from({ length: 6 }).map((_, idx) => {
+                {Array.from({ length: 8 }).map((_, idx) => {
                   const char = codeValue[idx] || '';
                   const isActive = codeValue.length === idx;
                   const isFilled = char !== '';
@@ -202,7 +202,7 @@ export default function CodeEntryScreen() {
             <TextInput
               ref={hiddenInputRef}
               style={styles.hiddenInput}
-              maxLength={6}
+              maxLength={8}
               value={codeValue}
               onChangeText={handleTextChange}
               autoCapitalize="characters"

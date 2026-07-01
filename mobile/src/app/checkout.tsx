@@ -290,13 +290,13 @@ export default function CheckoutScreen() {
                 style={styles.hiddenInput}
                 value={codeValue}
                 onChangeText={(text) => {
-                  const clean = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                  const clean = text.toUpperCase().replace(/[^A-Z0-9-]/g, '');
                   setCodeValue(clean);
-                  if (clean.length === 6) {
+                  if (clean.length === 8) {
                     handleSubmitCode(clean);
                   }
                 }}
-                maxLength={6}
+                maxLength={8}
                 keyboardType="default"
                 autoCorrect={false}
                 autoCapitalize="characters"
@@ -307,8 +307,9 @@ export default function CheckoutScreen() {
                 style={styles.boxesRow}
                 onPress={() => hiddenInputRef.current?.focus()}
                 activeOpacity={1}
+                onPressIn={() => hiddenInputRef.current?.focus()}
               >
-                {Array.from({ length: 6 }).map((_, idx) => {
+                {Array.from({ length: 8 }).map((_, idx) => {
                   const char = codeValue[idx] || '';
                   const isActive = codeValue.length === idx;
                   const isFilled = char !== '';
