@@ -31,6 +31,10 @@ export default function ScannerScreen() {
   const [successData, setSuccessData] = useState<{ message: string, sessionCode: string, timestamp: string } | null>(null);
   const [scanEnabled, setScanEnabled] = useState(false);
 
+  // Scanning animation values
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.5)).current;
+
   useEffect(() => {
     const timer = setTimeout(() => setScanEnabled(true), 1000);
     return () => clearTimeout(timer);
