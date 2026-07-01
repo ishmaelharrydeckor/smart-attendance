@@ -175,7 +175,11 @@ router.get('/active-session', async (req, res) => {
        FROM sessions s
        JOIN courses c ON s.course_id = c.id
        JOIN course_enrollments ce ON s.course_id = ce.course_id
-       WHERE ce.student_id = $1 AND s.is_active = true AND s.end_time > CURRENT_TIMESTAMP
+       LEFT JOIN attendance_records ar ON s.id = ar.session_id AND ar.student_id = $1
+       WHERE ce.student_id = $1 
+         AND s.is_active = true 
+         AND s.end_time > CURRENT_TIMESTAMP
+         AND (ar.checkout_timestamp IS NULL)
        ORDER BY s.start_time DESC
        LIMIT 1`,
       [req.user.id]
