@@ -254,7 +254,7 @@ export default function ScannerScreen() {
   }
 
   // Determine scanning status text and color
-  let statusText = 'Scanning...';
+  let statusText = isOnline ? 'Scanning...' : 'Scanning (Offline)...';
   let statusDotColor = Colors.Neutral400;
   let statusIcon = 'scan-outline';
 
@@ -306,11 +306,13 @@ export default function ScannerScreen() {
 
         {/* Floating Bottom status sheet */}
         <View style={styles.bottomSheet}>
-          {!isOnline && !isCheckout && (
+          {!isOnline && (
             <View style={styles.offlineWarningBanner}>
               <Ionicons name="warning" size={14} color="#ffc107" />
               <Text style={styles.offlineWarningText}>
-                You're offline — QR check-in may not work if you reconnect after 1 minute. Use 'Enter code instead' for reliable offline check-in.
+                {isCheckout
+                  ? "You're offline — QR checkout may not work if you reconnect after 1 minute. Use 'Enter checkout code' for reliable offline checkout."
+                  : "You're offline — QR check-in may not work if you reconnect after 1 minute. Use 'Enter code instead' for reliable offline check-in."}
               </Text>
             </View>
           )}
