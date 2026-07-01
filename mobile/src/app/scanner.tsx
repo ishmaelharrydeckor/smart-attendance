@@ -120,48 +120,48 @@ export default function ScannerScreen() {
         });
       }
 
-      if (isCheckout) {
-        if (!sessionId) {
+      let scannedSessionId = null;
+      if (data.includes('session_id=')) {
+        const sidParts = data.split('session_id=');
+        if (sidParts.length > 1) {
+          scannedSessionId = sidParts[1].split('&')[0];
+        }
+      }
+
+      const finalSessionId = sessionId || scannedSessionId;
+      const isCheckoutScan = isCheckout || data.includes('check-out');
+
+      if (isCheckoutScan) {
+        if (!finalSessionId) {
           throw new Error('Active session ID not found.');
         }
 
         const res = await enqueue({
-          endpoint: params.mode === 'checkout' ? '/api/student/check-out' : `/api/sessions/${sessionId}/checkout`,
+          endpoint: '/api/student/check-out',
           method: 'POST',
-          payload: params.mode === 'checkout'
-            ? { session_id: Number(sessionId), qr_token: qrToken }
-            : { method: 'qr', qr_token: qrToken },
+          payload: { session_id: Number(finalSessionId), qr_token: qrToken },
         });
 
         if (res.status === 'submitted') {
           const resData = res.data as any;
-          if (params.mode === 'checkout') {
-            router.replace({
-              pathname: '/checkout',
-              params: {
-                duration_minutes: resData.duration_minutes,
-                attendance_status: resData.attendance_status,
-                session_id: sessionId,
-              },
-            });
-            return;
-          } else {
-            Alert.alert('Success', resData.message || 'Checked out successfully!');
-          }
+          router.replace({
+            pathname: '/checkout',
+            params: {
+              duration_minutes: resData.duration_minutes,
+              attendance_status: resData.attendance_status,
+              session_id: finalSessionId,
+            },
+          });
+          return;
         } else if (res.status === 'queued') {
-          if (params.mode === 'checkout') {
-            router.replace({
-              pathname: '/checkout',
-              params: {
-                is_queued: 'true',
-                session_id: sessionId,
-              },
-            });
-            return;
-          } else {
-            setQueuedState('checkout');
-            return;
-          }
+          router.replace({
+            pathname: '/checkout',
+            params: {
+              is_queued: 'true',
+              session_id: finalSessionId,
+            },
+          });
+          return;
         } else {
           Alert.alert('Scan Failed', res.error);
           setScanned(false);

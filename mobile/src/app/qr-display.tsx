@@ -132,8 +132,8 @@ export default function QrDisplayScreen() {
 
   const hasCheckout = activeSession.checkout_active;
   const qrValue = mode === 'checkout'
-    ? `smartroll://check-out?qr=${activeSession.checkout_qr_token}`
-    : `smartroll://check-in?qr=${activeSession.qr_token}`;
+    ? `smartroll://check-out?qr=${activeSession.checkout_qr_token}&session_id=${activeSession.id}`
+    : `smartroll://check-in?qr=${activeSession.qr_token}&session_id=${activeSession.id}`;
   
   const pinCode = mode === 'checkin' ? activeSession.session_code : activeSession.checkout_session_code;
 
